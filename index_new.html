@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>TMF 盤感訓練器 V1.0</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1118;--panel:#121c27;--line:#263545;--muted:#9aabba;--green:#20c887;--red:#f06468;--blue:#67a9ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#edf4fa;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{padding:15px 16px 10px;background:#101923;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+h1{font-size:18px;margin:0 0 5px}.sub{font-size:12px;color:var(--muted)}
+main{padding:12px;max-width:900px;margin:auto}.panel{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:12px;margin-bottom:11px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:#0c151e;padding:9px;border-radius:9px;min-width:0}.stat small{display:block;color:var(--muted);font-size:11px}.stat b{display:block;font-size:14px;margin-top:4px;overflow:hidden;text-overflow:ellipsis}
+canvas{width:100%;height:310px;display:block;background:#0b131c;border-radius:9px;touch-action:pan-y}
+button,select,input{background:#1b2a39;color:#edf4fa;border:1px solid #35485b;border-radius:9px;padding:10px 12px;font-size:14px}
+button{flex:1;min-width:66px;font-weight:600}button.primary{background:#176b50;border-color:#218c69}button:disabled{opacity:.4}
+label{color:var(--muted);font-size:12px}select{padding:9px}
+.note{color:var(--muted);font-size:12px;line-height:1.5}.tag{display:inline-block;padding:4px 8px;border-radius:99px;background:#173d32;color:#8ce3c0;font-size:11px}
+#status{color:#8ce3c0;font-size:12px}#file{max-width:100%;font-size:12px}
+@media(max-width:480px){canvas{height:280px}.stats{grid-template-columns:repeat(3,1fr)}button{padding:10px 7px;font-size:13px}}
+</style>
+</head>
+<body>
+<header><h1>TMF 盤感訓練器 <span class="tag">V1.0 原型</span></h1><div class="sub">5 分鐘 K 線・逐根盲測・真實歷史資料</div></header>
+<main>
+<section class="panel">
+ <div class="row" style="justify-content:space-between"><b>行情狀態</b><span id="status">資料載入中…</span></div>
+ <div class="stats" style="margin-top:10px">
+  <div class="stat"><small>交易日期</small><b id="date">—</b></div>
+  <div class="stat"><small>已揭露 K 線</small><b id="count">—</b></div>
+  <div class="stat"><small>目前收盤</small><b id="price">—</b></div>
+ </div>
+</section>
+<section class="panel">
+ <div class="row" style="justify-content:space-between;margin-bottom:8px"><b>5 分鐘 K 線</b><span class="sub">只繪製已揭露行情</span></div>
+ <canvas id="chart" width="900" height="420"></canvas>
+ <div class="note" style="margin-top:8px">紅 K：收高；綠 K：收低。左右滑動可瀏覽已揭露的歷史 K 線，不會顯示未來行情。</div>
+  <button id="latest" type="button" style="margin-top:8px;flex:none">回到最新 K 線</button>
+</section>
+<section class="panel">
+ <b>回放控制</b>
+ <div class="row" style="margin-top:10px">
+  <button id="step" class="primary">下一根 K</button><button id="play">▶ 播放</button><button id="reset">重新開始</button>
+ </div>
+ <div class="row" style="margin-top:10px">
+  <label for="speed">播放速度</label><select id="speed"><option value="1500">慢速</option><option value="800" selected>正常</option><option value="300">快速</option><option value="100">極速</option></select>
+  <label for="visible">顯示根數</label><select id="visible"><option>30</option><option>50</option><option>80</option><option>120</option></select>
+ </div>
+</section>
+<section class="panel">
+ <b>選擇訓練場次</b>
+ <div class="row" style="margin-top:10px">
+  <select id="session" style="flex:1;min-width:180px"></select><button id="newSession">隨機選一天</button>
+ </div>
+ <p class="note">目前版本以完整交易日作為一局。開始時揭露前 30 根 K 線，後續逐根解鎖。跨交易日不會連接成同一段行情。</p>
+</section>
+<section class="panel">
+ <b>版本說明與限制</b>
+ <p class="note">這是第一個可操作原型：已接入你提供的 2024–2025 TMFR1 5 分鐘資料。現階段尚未加入模擬下單、停損停利、手續費、滑價、交易紀錄與績效統計；這些會在下一版加入。此原型不會將隨機生成行情當成真實行情。</p>
+ <p class="note">資料來源：使用者提供的 TMFR1 5 分鐘 CSV。若資料缺少時段，回放會保留實際時間順序，不會補造 K 線。</p>
+</section>
+</main>
+<script>
+let all=[], dates=[], bars=[], revealed=0, timer=null, viewStart=0;
+const $=id=>document.getElementById(id);
+function setStatus(s){$('status').textContent=s}
+function parseCSV(text){
+ const lines=text.trim().split(/\r?\n/); const head=lines.shift().split(',');
+ const ix=Object.fromEntries(head.map((v,i)=>[v.trim(),i]));
+ return lines.map(line=>{const c=line.split(',');return {t:c[ix.datetime],d:c[ix.trading_date],o:+c[ix.open],h:+c[ix.high],l:+c[ix.low],c:+c[ix.close],v:+c[ix.volume]};})
+ .filter(x=>x.t&&x.d&&[x.o,x.h,x.l,x.c].every(Number.isFinite));
+}
+function loadDate(d){stop();bars=all.filter(x=>x.d===d);revealed=Math.min(30,bars.length);viewStart=0;$('date').textContent=d;render();setStatus(`盲測中・${bars.length} 根`)}
+function render(){const shown=bars.slice(0,revealed),last=shown.at(-1);$('count').textContent=`${revealed} / ${bars.length}`;$('price').textContent=last?last.c.toLocaleString('en-US'):'—';const n=Math.min(+$('visible').value,shown.length);viewStart=Math.max(0,Math.min(viewStart,shown.length-n));draw(shown);$('step').disabled=revealed>=bars.length}
+function draw(data){const cv=$('chart'),ctx=cv.getContext('2d'),w=cv.width,h=cv.height;ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b131c';ctx.fillRect(0,0,w,h);if(!data.length)return;const n=Math.min(+$('visible').value,data.length),maxStart=Math.max(0,data.length-n);viewStart=Math.max(0,Math.min(viewStart,maxStart));const a=data.slice(viewStart,viewStart+n);let lo=Math.min(...a.map(x=>x.l)),hi=Math.max(...a.map(x=>x.h)),pad=(hi-lo)*.09||10;lo-=pad;hi+=pad;const left=58,right=12,top=18,bottom=28,ph=h-top-bottom,pw=w-left-right;ctx.font='12px sans-serif';ctx.strokeStyle='#263545';ctx.fillStyle='#9aabba';for(let j=0;j<=4;j++){let y=top+ph*j/4;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();ctx.fillText((hi-(hi-lo)*j/4).toFixed(0),5,y+4)}const yv=p=>top+(hi-p)/(hi-lo)*ph,step=pw/a.length,body=Math.max(3,step*.58);a.forEach((x,i)=>{let xx=left+i*step+step/2,up=x.c>=x.o,col=up?'#f06468':'#20c887';ctx.strokeStyle=col;ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(xx,yv(x.h));ctx.lineTo(xx,yv(x.l));ctx.stroke();let y=Math.min(yv(x.o),yv(x.c)),bh=Math.max(2,Math.abs(yv(x.o)-yv(x.c)));ctx.fillRect(xx-body/2,y,body,bh)});ctx.fillStyle='#9aabba';ctx.fillText(a[0].t.slice(11,16),left,h-7);ctx.fillText(a[a.length-1].t.slice(11,16),w-62,h-7)}
+function step(){if(revealed<bars.length){const n=Math.min(+$('visible').value,revealed),wasAtLatest=viewStart>=Math.max(0,revealed-n);revealed++;if(wasAtLatest)viewStart=Math.max(0,revealed-Math.min(+$('visible').value,revealed));render()}if(revealed>=bars.length){stop();setStatus('本局結束')}}function stop(){if(timer)clearInterval(timer);timer=null;$('play').textContent='▶ 播放'}function play(){if(timer){stop();return}if(revealed>=bars.length)return;$('play').textContent='Ⅱ 暫停';timer=setInterval(step,+$('speed').value)}
+const chart=$('chart');let dragX=null;
+chart.addEventListener('pointerdown',e=>{dragX=e.clientX;});
+chart.addEventListener('pointerup',e=>{if(dragX===null)return;const dx=e.clientX-dragX;dragX=null;if(Math.abs(dx)<24)return;const n=Math.min(+$('visible').value,revealed),maxStart=Math.max(0,revealed-n);const barsToMove=Math.max(1,Math.round(Math.abs(dx)/18));viewStart=Math.max(0,Math.min(maxStart,viewStart+(dx<0?barsToMove:-barsToMove)));render();});
+chart.addEventListener('pointercancel',()=>{dragX=null;});
+$('step').onclick=step;$('play').onclick=play;$('reset').onclick=()=>loadDate($('session').value);$('speed').onchange=()=>{if(timer){stop();play()}};$('visible').onchange=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);render()};$('latest').onclick=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);render()};$('session').onchange=()=>loadDate($('session').value);$('newSession').onclick=()=>{const d=dates[Math.floor(Math.random()*dates.length)];$('session').value=d;loadDate(d)};
+async function init(){try{setStatus('正在載入 CSV…');const res=await fetch('./TMFR1_5min_2024-2025.csv');if(!res.ok)throw new Error(`CSV 載入失敗：HTTP ${res.status}`);all=parseCSV(await res.text());if(!all.length)throw new Error('CSV 沒有可用行情');dates=[...new Set(all.map(x=>x.d))].sort();dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;$('session').appendChild(o)});$('session').value=dates[0];loadDate(dates[0]);setStatus(`資料載入完成・${all.length.toLocaleString()} 根`)}catch(e){setStatus('載入失敗');const msg=document.createElement('p');msg.className='note';msg.style.color='#f06468';msg.textContent=e.message+'。請確認 CSV 與 HTML 位於同一個 GitHub Repository 根目錄，並透過 GitHub Pages 網址開啟。';document.querySelector('main').prepend(msg)}}
+init();
+</script>
+</body></html>
