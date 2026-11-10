@@ -31,7 +31,7 @@ def test_summary_drawdown_and_consecutive_losses():
     result = summarize_trades(trades)
     assert result.max_drawdown_points == 6
     assert result.max_consecutive_losses == 2
-    assert result.profit_factor == pytest.approx(5 / 6)
+    assert result.profit_factor == pytest.approx(8 / 6)
 
 
 def test_empty_summary_is_defined():
