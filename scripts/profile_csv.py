@@ -9,6 +9,8 @@ from datetime import datetime
 from math import isfinite
 from pathlib import Path
 
+from research_engine.session_audit import classify_tmfr1_interval
+
 
 ALIASES = {
     "timestamp": ("datetime", "timestamp", "時間", "日期時間"),
@@ -63,6 +65,8 @@ def profile(path: Path) -> dict:
         max_prices = {k: None for k in ("open", "high", "low", "close")}
         interval_counts = Counter()
         interval_examples = {}
+        interval_classes = Counter()
+        unexpected_examples = []
         first_rows = []
         trading_dates = set()
         previous_trading_date = None
@@ -92,6 +96,14 @@ def profile(path: Path) -> dict:
                 else:
                     key = str(int(delta))
                     interval_counts[key] += 1
+                    classification = classify_tmfr1_interval(previous_timestamp, ts)
+                    interval_classes[classification] += 1
+                    if classification == "unexpected_interval" and len(unexpected_examples) < 50:
+                        unexpected_examples.append({
+                            "previous_timestamp": previous_timestamp.isoformat(sep=" "),
+                            "current_timestamp": ts.isoformat(sep=" "),
+                            "delta_seconds": int(delta),
+                        })
                     examples = interval_examples.setdefault(key, [])
                     if len(examples) < 8:
                         examples.append({
@@ -148,6 +160,8 @@ def profile(path: Path) -> dict:
             "trading_date_count": len(trading_dates),
             "interval_seconds_counts": dict(sorted(interval_counts.items(), key=lambda x: int(x[0]))),
             "interval_examples": {k: interval_examples[k] for k in sorted(interval_examples, key=int)},
+            "interval_class_counts": dict(sorted(interval_classes.items())),
+            "unexpected_interval_examples": unexpected_examples,
             "price_min": min_prices,
             "price_max": max_prices,
             "sample_first_rows": first_rows,
