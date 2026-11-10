@@ -49,22 +49,22 @@ def test_rejects_duplicate_or_unsorted_timestamps():
 
 
 def test_rejects_missing_required_cell():
-    csv_text = "timestamp,open,high,low,close,volume\\n2025-01-01T09:00:00,100,,99,101,10\\n"
+    csv_text = "timestamp,open,high,low,close,volume\n2025-01-01T09:00:00,100,,99,101,10\n"
     with pytest.raises(ValueError, match="missing value for high"):
         load_bars_csv(StringIO(csv_text))
 
 
 def test_rejects_mixed_timezone_awareness():
     csv_text = (
-        "timestamp,open,high,low,close,volume\\n"
-        "2025-01-01T09:00:00,100,102,99,101,10\\n"
-        "2025-01-01T09:05:00+08:00,101,103,100,102,10\\n"
+        "timestamp,open,high,low,close,volume\n"
+        "2025-01-01T09:00:00,100,102,99,101,10\n"
+        "2025-01-01T09:05:00+08:00,101,103,100,102,10\n"
     )
     with pytest.raises(ValueError, match="mixed timezone-aware"):
         load_bars_csv(StringIO(csv_text))
 
 
 def test_rejects_extra_csv_fields():
-    csv_text = "timestamp,open,high,low,close,volume\\n2025-01-01T09:00:00,100,102,99,101,10,unexpected\\n"
+    csv_text = "timestamp,open,high,low,close,volume\n2025-01-01T09:00:00,100,102,99,101,10,unexpected\n"
     with pytest.raises(ValueError, match="extra CSV fields"):
         load_bars_csv(StringIO(csv_text))
