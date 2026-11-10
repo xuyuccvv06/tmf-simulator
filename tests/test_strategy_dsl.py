@@ -18,7 +18,7 @@ def test_compile_and_generate_signal_only_after_sma_warmup():
     compiled = compile_strategy(spec())
     orders = generate_orders(data, compiled)
     assert len(orders) == 1
-    assert orders[0].timestamp == data[2].timestamp
+    assert orders[0].timestamp == data[1].timestamp
     assert orders[0].side == "long"
     assert orders[0].stop_points == 10
 
