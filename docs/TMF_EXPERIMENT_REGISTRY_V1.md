@@ -20,11 +20,11 @@ Experiment ID 由規格內容的 canonical JSON SHA-256 前 20 位產生。資�
 
 ## 審核與執行狀態
 
-新實驗預設為 `pending_human_approval` 與 `registered`。在使用者/研究負責人明確核准前，不允許附加正式回測結果。此版不會由 AI 自行核准。
+新實驗預設為 `awaiting_human_approval`。人工核准會另存為 `<experiment_id>.approval.json`，包含核准人、理由及原始規格 SHA-256。核准紀錄必須與 Experiment ID 及規格雜湊一致；不得直接修改實驗規格來核准。AI 不具備自行核准權限。
 
 ## 結果保存
 
-結果另存為 `<experiment_id>.result.json`，並計算結果 JSON SHA-256。既有結果若內容不同，拒絕覆寫。不同參數或成本設定必須建立新實驗，不得改寫舊規格。
+結果另存為 `<experiment_id>.result.json`，並計算結果 JSON SHA-256。附加正式結果前，系統會驗證獨立人工核准紀錄及原始規格雜湊。既有結果若內容不同，拒絕覆寫。不同參數或成本設定必須建立新實驗，不得改寫舊規格。
 
 ## 使用方式
 
