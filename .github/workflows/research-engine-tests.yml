@@ -45,10 +45,7 @@ jobs:
         if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
         run: |
           mkdir -p build/datasets
-          python scripts/standardize_csv.py TMFR1_5min_2024-2025.csv \\
-            --output build/datasets/tmfr1_5m_2024-2025_standard.csv \\
-            --manifest build/datasets/tmfr1_5m_2024-2025_manifest.json \\
-            --timeframe 5m
+          python scripts/standardize_csv.py TMFR1_5min_2024-2025.csv --output build/datasets/tmfr1_5m_2024-2025_standard.csv --manifest build/datasets/tmfr1_5m_2024-2025_manifest.json --timeframe 5m
       - name: Upload canonical dataset and manifest
         if: hashFiles('build/datasets/tmfr1_5m_2024-2025_standard.csv') != ''
         uses: actions/upload-artifact@v4
