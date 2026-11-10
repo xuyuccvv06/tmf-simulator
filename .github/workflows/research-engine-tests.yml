@@ -41,6 +41,16 @@ jobs:
           assert not unexpected, f"unexpected intervals found: {unexpected[:20]}"
           print({"rows": len(bars), "interval_classes": classes, "audit": audit})
           PY
+      - name: Audit expiry-window continuous-series proxies (not roll spreads)
+        if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
+        run: python scripts/audit_roll_proxies.py TMFR1_5min_2024-2025.csv --output tmfr1_expiry_window_audit.json
+      - name: Upload expiry-window audit
+        if: hashFiles('tmfr1_expiry_window_audit.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmfr1-expiry-window-audit
+          path: tmfr1_expiry_window_audit.json
+          if-no-files-found: error
       - name: Upload TMFR1 CSV profile
         if: hashFiles('tmfr1_csv_profile.json') != ''
         uses: actions/upload-artifact@v4
