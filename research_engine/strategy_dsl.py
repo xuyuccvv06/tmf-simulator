@@ -30,6 +30,9 @@ def _number(value: Any, name: str, *, minimum: float | None = None) -> float:
 def compile_strategy(spec: dict) -> CompiledStrategy:
     if not isinstance(spec, dict) or spec.get("dsl_version") != "1.0":
         raise ValueError("dsl_version must be 1.0")
+    allowed_top = {"dsl_version", "strategy_id", "strategy_version", "timeframe", "side", "indicators", "entry", "risk"}
+    if set(spec) - allowed_top:
+        raise ValueError("unknown top-level strategy fields are not allowed")
     for key in ("strategy_id", "strategy_version"):
         if not isinstance(spec.get(key), str) or not spec[key].strip():
             raise ValueError(f"{key} is required")
@@ -44,6 +47,9 @@ def compile_strategy(spec: dict) -> CompiledStrategy:
         if not isinstance(name, str) or not name.isidentifier() or not isinstance(definition, dict):
             raise ValueError("indicator names and definitions must be valid objects")
         kind = definition.get("type")
+        allowed_definition = {"type", "source"} if kind == "sma" else ({"type", "period"} if kind == "volume_sma" else {"type"})
+        if set(definition) - allowed_definition:
+            raise ValueError(f"{name} contains unsupported indicator fields")
         if kind not in ALLOWED_INDICATORS:
             raise ValueError(f"indicator type is not allowed: {kind}")
         if kind in {"sma", "volume_sma"}:
@@ -53,6 +59,8 @@ def compile_strategy(spec: dict) -> CompiledStrategy:
     entry = spec.get("entry")
     if not isinstance(entry, dict):
         raise ValueError("entry must be an object")
+    if set(entry) - {"all", "any"}:
+        raise ValueError("entry contains unsupported fields")
     all_rules, any_rules = entry.get("all", []), entry.get("any", [])
     if not isinstance(all_rules, list) or not isinstance(any_rules, list) or (not all_rules and not any_rules):
         raise ValueError("entry requires non-empty all or any conditions")
@@ -60,8 +68,8 @@ def compile_strategy(spec: dict) -> CompiledStrategy:
     for field in ("open", "high", "low", "close", "volume", "range_points", "body_points"):
         known.add(field)
     for condition in all_rules + any_rules:
-        if not isinstance(condition, dict) or condition.get("operator") not in ALLOWED_OPERATORS:
-            raise ValueError("each condition requires an allowed operator")
+        if not isinstance(condition, dict) or set(condition) != {"left", "operator", "right"} or condition.get("operator") not in ALLOWED_OPERATORS:
+            raise ValueError("each condition requires only left, operator, and an allowed operator")
         for operand in ("left", "right"):
             value = condition.get(operand)
             if isinstance(value, dict):
@@ -72,6 +80,8 @@ def compile_strategy(spec: dict) -> CompiledStrategy:
     risk = spec.get("risk", {})
     if not isinstance(risk, dict):
         raise ValueError("risk must be an object")
+    if set(risk) - {"stop_points", "target_points"}:
+        raise ValueError("risk contains unsupported fields")
     stop = risk.get("stop_points")
     target = risk.get("target_points")
     if stop is not None: stop = _number(stop, "stop_points", minimum=0.0000001)
