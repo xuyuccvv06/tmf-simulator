@@ -26,7 +26,6 @@ jobs:
           from datetime import timedelta
           from research_engine import load_bars_csv, audit_bars
           from research_engine.session_audit import classify_tmfr1_interval
-
           bars = load_bars_csv("TMFR1_5min_2024-2025.csv")
           audit = audit_bars(bars, expected_interval=timedelta(minutes=5))
           assert len(bars) == 79689, f"unexpected row count: {len(bars)}"
@@ -46,7 +45,11 @@ jobs:
         run: |
           mkdir -p build/datasets
           python scripts/standardize_csv.py TMFR1_5min_2024-2025.csv --output build/datasets/tmfr1_5m_2024-2025_standard.csv --manifest build/datasets/tmfr1_5m_2024-2025_manifest.json --timeframe 5m
-      - name: Upload canonical dataset and manifest
+      - name: Register canonical dataset in append-only registry
+        if: hashFiles('build/datasets/tmfr1_5m_2024-2025_standard.csv') != ''
+        run: |
+          python scripts/register_dataset.py --csv build/datasets/tmfr1_5m_2024-2025_standard.csv --manifest build/datasets/tmfr1_5m_2024-2025_manifest.json --registry build/datasets/registry.json
+      - name: Upload canonical dataset, manifest, and registry
         if: hashFiles('build/datasets/tmfr1_5m_2024-2025_standard.csv') != ''
         uses: actions/upload-artifact@v4
         with:
