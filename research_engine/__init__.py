@@ -6,5 +6,16 @@ from .performance import PerformanceSummary, summarize_trades
 from .csv_loader import load_bars_csv
 from .sessions import SessionWindow, classify_session, validate_session_windows
 from .audit import DataAudit, audit_bars
+from .research_workflow import (
+    validate_research_proposal,
+    validate_adversarial_review,
+    create_research_packet,
+)
 
-__all__ = ["Bar", "Order", "Trade", "validate_bars", "simulate", "PerformanceSummary", "summarize_trades", "load_bars_csv", "SessionWindow", "classify_session", "validate_session_windows", "DataAudit", "audit_bars"]
+__all__ = [
+    "Bar", "Order", "Trade", "validate_bars", "simulate",
+    "PerformanceSummary", "summarize_trades", "load_bars_csv",
+    "SessionWindow", "classify_session", "validate_session_windows",
+    "DataAudit", "audit_bars", "validate_research_proposal",
+    "validate_adversarial_review", "create_research_packet",
+]
