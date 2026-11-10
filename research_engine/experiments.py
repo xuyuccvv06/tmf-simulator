@@ -90,5 +90,5 @@ def approve_experiment(*, experiment_root: Path, experiment_id: str, approved_by
     approval = {"experiment_id": experiment_id, "spec_sha256": spec_hash,
                 "approved_by": approved_by, "rationale": rationale, "approval_status": "approved"}
     path = experiment_root / (experiment_id + ".approval.json")
-    _write_new(path, json.dumps(approval, ensure_ascii=False, indent=2, sort_keys=True) + "\\n")
+    _write_new(path, json.dumps(approval, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
     return {"experiment_id": experiment_id, "approval_path": str(path), "approval": approval}
