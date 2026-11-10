@@ -83,10 +83,21 @@ def load_bars_csv(
             raise ValueError(f"CSV missing required columns: {', '.join(missing)}")
 
         bars: list[Bar] = []
+        timezone_aware: bool | None = None
         for row_number, row in enumerate(reader, start=2):
-            if not row or all(value is None or not value.strip() for value in row.values()):
+            if None in row:
+                raise ValueError(f"row {row_number}: extra CSV fields beyond header")
+            if not row or all(value is None or not str(value).strip() for value in row.values()):
                 raise ValueError(f"row {row_number}: blank rows are not allowed")
+            for field, header in resolved.items():
+                if row.get(header) is None or not str(row[header]).strip():
+                    raise ValueError(f"row {row_number}: missing value for {field}")
             timestamp = _parse_timestamp(row[resolved["timestamp"]], row_number)
+            current_aware = timestamp.utcoffset() is not None
+            if timezone_aware is None:
+                timezone_aware = current_aware
+            elif timezone_aware != current_aware:
+                raise ValueError(f"row {row_number}: mixed timezone-aware and naive timestamps")
             values = {
                 field: _parse_number(row[resolved[field]], field, row_number)
                 for field in ("open", "high", "low", "close")
