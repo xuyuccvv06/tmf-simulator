@@ -47,7 +47,7 @@ def compile_strategy(spec: dict) -> CompiledStrategy:
         if not isinstance(name, str) or not name.isidentifier() or not isinstance(definition, dict):
             raise ValueError("indicator names and definitions must be valid objects")
         kind = definition.get("type")
-        allowed_definition = {"type", "source"} if kind == "sma" else ({"type", "period"} if kind == "volume_sma" else {"type"})
+        allowed_definition = {"type", "source", "period"} if kind == "sma" else ({"type", "period"} if kind == "volume_sma" else {"type"})
         if set(definition) - allowed_definition:
             raise ValueError(f"{name} contains unsupported indicator fields")
         if kind not in ALLOWED_INDICATORS:
