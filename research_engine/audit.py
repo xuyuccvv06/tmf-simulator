@@ -27,6 +27,8 @@ def audit_bars(bars: list[Bar], *, expected_interval: timedelta | None = None) -
     a separately verified exchange calendar before treating gaps as defects.
     """
     errors = tuple(validate_bars(bars))
+    if expected_interval is not None and expected_interval.total_seconds() <= 0:
+        raise ValueError("expected_interval must be positive")
     if not bars:
         return DataAudit(0, None, None, "empty", errors, 0, 0.0, 0)
 
