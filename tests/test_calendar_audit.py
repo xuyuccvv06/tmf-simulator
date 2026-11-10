@@ -39,12 +39,12 @@ def test_classifies_official_closure_gap():
 
 def test_does_not_assume_unlisted_weekday_is_a_holiday():
     result = classify_overnight_gap(
-        datetime(2025, 1, 6, 4, 55),
-        datetime(2025, 1, 8, 8, 45),
+        datetime(2025, 1, 4, 4, 55),
+        datetime(2025, 1, 7, 8, 45),
         {},
     )
     assert result["classification"] == "contains_unverified_weekday"
-    assert result["unverified_weekdays"] == ["2025-01-07"]
+    assert result["unverified_weekdays"] == ["2025-01-06"]
 
 
 def test_classifies_regular_same_date_overnight_break():
