@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0.0",
+  "canonical_columns": [
+    "timestamp",
+    "trading_date",
+    "product_id",
+    "timeframe",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume"
+  ],
+  "timestamp": {
+    "format": "ISO-8601",
+    "timezone": "Asia/Taipei",
+    "source_naive_timestamps": "Interpret as Asia/Taipei; do not shift clock values"
+  },
+  "price_unit": "index_points",
+  "volume_unit": "source_contracts_or_provider_unit; retain source unit metadata",
+  "rules": [
+    "Never fill, interpolate, synthesize, or silently drop rows",
+    "Never combine different product identifiers or timeframes in one output",
+    "Preserve trading_date exactly as supplied by the source",
+    "Preserve source file and SHA-256 in the manifest",
+    "Continuous contract TMFR1 is not an individual expiry-month contract"
+  ]
+}
