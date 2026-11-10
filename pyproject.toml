@@ -11,5 +11,9 @@ dependencies = []
 [project.optional-dependencies]
 test = ["pytest>=8"]
 
+[tool.setuptools.packages.find]
+include = ["research_engine*"]
+exclude = ["supabase*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
