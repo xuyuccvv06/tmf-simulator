@@ -1,7 +1,7 @@
 import hashlib, json
 from pathlib import Path
 import pytest
-from research_engine.experiments import create_experiment, record_experiment_result
+from research_engine.experiments import approve_experiment, create_experiment, record_experiment_result
 
 def setup_registry(tmp_path):
     digest = "a" * 64
@@ -24,8 +24,7 @@ def test_experiment_id_is_deterministic_and_spec_is_saved(tmp_path):
     second = make_experiment(tmp_path)
     assert first["experiment_id"] == second["experiment_id"]
     saved = json.loads(Path(first["path"]).read_text())
-    assert saved["approval_status"] == "pending_human_approval"
-    assert saved["run_status"] == "registered"
+    assert saved["run_status"] == "awaiting_human_approval"
     assert saved["dataset_timeframe"] == "5m"
 
 def test_different_cost_model_creates_different_experiment(tmp_path):
@@ -55,8 +54,7 @@ def test_formal_result_requires_human_approval(tmp_path):
 def test_result_is_immutable_after_approval(tmp_path):
     exp = make_experiment(tmp_path)
     path = Path(exp["path"]); spec = json.loads(path.read_text())
-    spec["approval_status"] = "approved"
-    path.write_text(json.dumps(spec), encoding="utf-8")
+    approve_experiment(experiment_root=tmp_path / "experiments", experiment_id=exp["experiment_id"], approved_by="research-lead", rationale="Approved for controlled test")
     args = {"experiment_root":tmp_path / "experiments","experiment_id":exp["experiment_id"]}
     record_experiment_result(**args, result={"net_points":10})
     with pytest.raises(FileExistsError, match="immutable"):
