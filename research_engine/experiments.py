@@ -41,7 +41,7 @@ def create_experiment(*, registry_path: Path, experiment_root: Path, dataset_id:
         "dataset_product_id": dataset["product_id"], "dataset_timeframe": dataset["timeframe"],
         "strategy_id": strategy_id, "strategy_version": strategy_version, "parameters": parameters,
         "cost_model": cost_model, "execution_model": execution_model, "code_revision": code_revision,
-        "hypothesis": hypothesis, "approval_status": "pending_human_approval", "run_status": "registered",
+        "hypothesis": hypothesis, "run_status": "awaiting_human_approval",
     }
     spec_json = _canonical_json(spec)
     experiment_id = "exp_" + hashlib.sha256(spec_json.encode("utf-8")).hexdigest()[:20]
@@ -58,11 +58,37 @@ def record_experiment_result(*, experiment_root: Path, experiment_id: str, resul
     if not spec_path.exists():
         raise FileNotFoundError("experiment specification not found")
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
-    if spec.get("approval_status") != "approved":
-        raise ValueError("human approval is required before attaching a formal result")
+    approval_path = experiment_root / (experiment_id + ".approval.json")
+    if not approval_path.exists():
+        raise ValueError("human approval record is required before attaching a formal result")
+    approval = json.loads(approval_path.read_text(encoding="utf-8"))
+    spec_hash = hashlib.sha256(_canonical_json({k: v for k, v in spec.items() if k != "experiment_id"}).encode("utf-8")).hexdigest()
+    if approval.get("experiment_id") != experiment_id or approval.get("spec_sha256") != spec_hash:
+        raise ValueError("approval record does not match immutable experiment specification")
+    if not approval.get("approved_by") or not approval.get("rationale"):
+        raise ValueError("approval record requires approved_by and rationale")
     result_json = _canonical_json(result)
     result_hash = hashlib.sha256(result_json.encode("utf-8")).hexdigest()
     result_record = {"experiment_id": experiment_id, "result_sha256": result_hash, "result": result}
     path = experiment_root / (experiment_id + ".result.json")
     _write_new(path, json.dumps(result_record, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False) + "\n")
     return {"experiment_id": experiment_id, "result_sha256": result_hash, "path": str(path)}
+def approve_experiment(*, experiment_root: Path, experiment_id: str, approved_by: str, rationale: str) -> dict:
+    if not experiment_id.startswith("exp_") or len(experiment_id) != 24:
+        raise ValueError("invalid experiment_id")
+    spec_path = experiment_root / (experiment_id + ".json")
+    if not spec_path.exists():
+        raise FileNotFoundError("experiment specification not found")
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    spec_payload = {k: v for k, v in spec.items() if k != "experiment_id"}
+    expected_id = "exp_" + hashlib.sha256(_canonical_json(spec_payload).encode("utf-8")).hexdigest()[:20]
+    if expected_id != experiment_id:
+        raise ValueError("experiment specification hash does not match experiment_id")
+    if not approved_by.strip() or not rationale.strip():
+        raise ValueError("approved_by and rationale are required")
+    spec_hash = hashlib.sha256(_canonical_json(spec_payload).encode("utf-8")).hexdigest()
+    approval = {"experiment_id": experiment_id, "spec_sha256": spec_hash,
+                "approved_by": approved_by, "rationale": rationale, "approval_status": "approved"}
+    path = experiment_root / (experiment_id + ".approval.json")
+    _write_new(path, json.dumps(approval, ensure_ascii=False, indent=2, sort_keys=True) + "\\n")
+    return {"experiment_id": experiment_id, "approval_path": str(path), "approval": approval}
