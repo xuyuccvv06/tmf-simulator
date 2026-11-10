@@ -16,3 +16,13 @@ jobs:
           python-version: "3.11"
       - run: python -m pip install -e ".[test]"
       - run: python -m pytest -q
+      - name: Profile checked-in TMFR1 CSV (read-only)
+        if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
+        run: python scripts/profile_csv.py TMFR1_5min_2024-2025.csv > tmfr1_csv_profile.json
+      - name: Upload TMFR1 CSV profile
+        if: hashFiles('tmfr1_csv_profile.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmfr1-csv-profile
+          path: tmfr1_csv_profile.json
+          if-no-files-found: error
