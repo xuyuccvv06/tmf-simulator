@@ -69,6 +69,7 @@ def profile(path: Path) -> dict:
         unexpected_examples = []
         first_rows = []
         trading_dates = set()
+        daily_coverage = {}
         previous_trading_date = None
         date_column = normalized.get("trading_date")
 
@@ -136,7 +137,26 @@ def profile(path: Path) -> dict:
                 min_prices[field] = value if min_prices[field] is None else min(min_prices[field], value)
                 max_prices[field] = value if max_prices[field] is None else max(max_prices[field], value)
             if date_column and row.get(date_column):
-                trading_dates.add(row[date_column])
+                trading_date = row[date_column]
+                trading_dates.add(trading_date)
+                bucket = daily_coverage.setdefault(trading_date, {
+                    "total": 0, "day": 0, "night": 0,
+                    "first_timestamp": ts.isoformat(sep=" "),
+                    "last_timestamp": ts.isoformat(sep=" "),
+                    "day_first": None, "day_last": None,
+                    "night_first": None, "night_last": None,
+                })
+                bucket["total"] += 1
+                clock = ts.time().replace(tzinfo=None)
+                if clock >= datetime.strptime("08:45", "%H:%M").time() and clock < datetime.strptime("13:45", "%H:%M").time():
+                    bucket["day"] += 1
+                    bucket["day_first"] = bucket["day_first"] or ts.isoformat(sep=" ")
+                    bucket["day_last"] = ts.isoformat(sep=" ")
+                elif clock >= datetime.strptime("15:00", "%H:%M").time() or clock < datetime.strptime("05:00", "%H:%M").time():
+                    bucket["night"] += 1
+                    bucket["night_first"] = bucket["night_first"] or ts.isoformat(sep=" ")
+                    bucket["night_last"] = ts.isoformat(sep=" ")
+                bucket["last_timestamp"] = ts.isoformat(sep=" ")
             if len(first_rows) < 5:
                 first_rows.append({k: row.get(k) for k in headers})
 
@@ -158,6 +178,15 @@ def profile(path: Path) -> dict:
             "first_timestamp": first_timestamp,
             "last_timestamp": last_timestamp,
             "trading_date_count": len(trading_dates),
+            "daily_coverage_count_distribution": dict(sorted(Counter(str(v["total"]) for v in daily_coverage.values()).items(), key=lambda x: int(x[0]))),
+            "daily_day_bar_count_distribution": dict(sorted(Counter(str(v["day"]) for v in daily_coverage.values()).items(), key=lambda x: int(x[0]))),
+            "daily_night_bar_count_distribution": dict(sorted(Counter(str(v["night"]) for v in daily_coverage.values()).items(), key=lambda x: int(x[0]))),
+            "daily_coverage_examples": list(daily_coverage.items())[:5],
+            "daily_coverage_outliers": [
+                {"trading_date": day, **values}
+                for day, values in daily_coverage.items()
+                if values["day"] not in (58, 60) or values["night"] not in (0, 168)
+            ][:100],
             "interval_seconds_counts": dict(sorted(interval_counts.items(), key=lambda x: int(x[0]))),
             "interval_examples": {k: interval_examples[k] for k in sorted(interval_examples, key=int)},
             "interval_class_counts": dict(sorted(interval_classes.items())),
