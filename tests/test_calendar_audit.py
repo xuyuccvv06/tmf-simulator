@@ -6,13 +6,14 @@ from research_engine.calendar_audit import classify_overnight_gap, load_closures
 def test_loads_source_linked_closure_calendar():
     closures = load_closures("data/calendars/taifex_market_closures_2024_2025.csv")
     assert date(2024, 10, 31) in closures
+    assert date(2025, 1, 23) in closures
     assert date(2025, 12, 25) in closures
 
 
 def test_classifies_regular_weekend_gap():
     closures = {}
     result = classify_overnight_gap(
-        datetime(2025, 1, 3, 4, 55),
+        datetime(2025, 1, 4, 4, 55),
         datetime(2025, 1, 6, 8, 45),
         closures,
     )
@@ -28,7 +29,7 @@ def test_classifies_official_closure_gap():
         }
     }
     result = classify_overnight_gap(
-        datetime(2024, 10, 30, 4, 55),
+        datetime(2024, 10, 31, 4, 55),
         datetime(2024, 11, 1, 8, 45),
         closures,
     )
