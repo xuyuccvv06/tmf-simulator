@@ -10,6 +10,7 @@ from math import isfinite
 from pathlib import Path
 
 from research_engine.session_audit import classify_tmfr1_interval
+from research_engine.calendar_audit import classify_overnight_gap, load_closures
 
 
 ALIASES = {
@@ -66,6 +67,9 @@ def profile(path: Path) -> dict:
         interval_counts = Counter()
         interval_examples = {}
         interval_classes = Counter()
+        calendar_gap_classes = Counter()
+        calendar_gap_examples = []
+        closures = load_closures("data/calendars/taifex_market_closures_2024_2025.csv")
         unexpected_examples = []
         first_rows = []
         trading_dates = set()
@@ -99,6 +103,16 @@ def profile(path: Path) -> dict:
                     interval_counts[key] += 1
                     classification = classify_tmfr1_interval(previous_timestamp, ts)
                     interval_classes[classification] += 1
+                    if classification == "after_hours_to_day":
+                        calendar_result = classify_overnight_gap(previous_timestamp, ts, closures)
+                        calendar_label = str(calendar_result["classification"])
+                        calendar_gap_classes[calendar_label] += 1
+                        if len(calendar_gap_examples) < 100:
+                            calendar_gap_examples.append({
+                                "previous_timestamp": previous_timestamp.isoformat(sep=" "),
+                                "current_timestamp": ts.isoformat(sep=" "),
+                                **calendar_result,
+                            })
                     if classification == "unexpected_interval" and len(unexpected_examples) < 50:
                         unexpected_examples.append({
                             "previous_timestamp": previous_timestamp.isoformat(sep=" "),
@@ -190,6 +204,9 @@ def profile(path: Path) -> dict:
             "interval_seconds_counts": dict(sorted(interval_counts.items(), key=lambda x: int(x[0]))),
             "interval_examples": {k: interval_examples[k] for k in sorted(interval_examples, key=int)},
             "interval_class_counts": dict(sorted(interval_classes.items())),
+            "calendar_gap_class_counts": dict(sorted(calendar_gap_classes.items())),
+            "calendar_gap_examples": calendar_gap_examples,
+            "closure_calendar_dates": len(closures),
             "unexpected_interval_examples": unexpected_examples,
             "price_min": min_prices,
             "price_max": max_prices,
