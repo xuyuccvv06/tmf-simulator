@@ -45,7 +45,7 @@ def classify_overnight_gap(
         }
 
     days = []
-    day = previous.date() + timedelta(days=1)
+    day = previous.date()
     while day < current.date():
         days.append(day)
         day += timedelta(days=1)
