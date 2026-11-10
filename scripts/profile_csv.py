@@ -107,7 +107,7 @@ def profile(path: Path) -> dict:
                         calendar_result = classify_overnight_gap(previous_timestamp, ts, closures)
                         calendar_label = str(calendar_result["classification"])
                         calendar_gap_classes[calendar_label] += 1
-                        if len(calendar_gap_examples) < 100:
+                        if len(calendar_gap_examples) < 400:
                             calendar_gap_examples.append({
                                 "previous_timestamp": previous_timestamp.isoformat(sep=" "),
                                 "current_timestamp": ts.isoformat(sep=" "),
