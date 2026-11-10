@@ -62,8 +62,10 @@ def profile(path: Path) -> dict:
         min_prices = {k: None for k in ("open", "high", "low", "close")}
         max_prices = {k: None for k in ("open", "high", "low", "close")}
         interval_counts = Counter()
+        interval_examples = {}
         first_rows = []
         trading_dates = set()
+        previous_trading_date = None
         date_column = normalized.get("trading_date")
 
         for row in reader:
@@ -80,6 +82,7 @@ def profile(path: Path) -> dict:
                 continue
             if first_timestamp is None:
                 first_timestamp = ts.isoformat(sep=" ")
+            current_trading_date = row.get(date_column) if date_column else None
             if previous_timestamp is not None:
                 delta = (ts - previous_timestamp).total_seconds()
                 if delta == 0:
@@ -87,8 +90,18 @@ def profile(path: Path) -> dict:
                 elif delta < 0:
                     out_of_order += 1
                 else:
-                    interval_counts[str(int(delta))] += 1
+                    key = str(int(delta))
+                    interval_counts[key] += 1
+                    examples = interval_examples.setdefault(key, [])
+                    if len(examples) < 8:
+                        examples.append({
+                            "previous_timestamp": previous_timestamp.isoformat(sep=" "),
+                            "previous_trading_date": previous_trading_date,
+                            "current_timestamp": ts.isoformat(sep=" "),
+                            "current_trading_date": current_trading_date,
+                        })
             previous_timestamp = ts
+            previous_trading_date = current_trading_date
             last_timestamp = ts.isoformat(sep=" ")
             values = {}
             try:
@@ -134,6 +147,7 @@ def profile(path: Path) -> dict:
             "last_timestamp": last_timestamp,
             "trading_date_count": len(trading_dates),
             "interval_seconds_counts": dict(sorted(interval_counts.items(), key=lambda x: int(x[0]))),
+            "interval_examples": {k: interval_examples[k] for k in sorted(interval_examples, key=int)},
             "price_min": min_prices,
             "price_max": max_prices,
             "sample_first_rows": first_rows,
