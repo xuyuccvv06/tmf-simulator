@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any
@@ -45,6 +46,8 @@ def _request_json(url: str, headers: dict[str, str], payload: dict, timeout: flo
 
 class GeminiAdapter:
     def __init__(self, config: ProviderConfig):
+        if config.timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be positive")
         if config.provider != "gemini":
             raise ValueError("GeminiAdapter requires provider=gemini")
         self.config = config
@@ -72,6 +75,8 @@ class GeminiAdapter:
 
 class OpenAIAdapter:
     def __init__(self, config: ProviderConfig):
+        if config.timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be positive")
         if config.provider != "openai":
             raise ValueError("OpenAIAdapter requires provider=openai")
         self.config = config
