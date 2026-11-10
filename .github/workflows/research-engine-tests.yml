@@ -41,6 +41,21 @@ jobs:
           assert not unexpected, f"unexpected intervals found: {unexpected[:20]}"
           print({"rows": len(bars), "interval_classes": classes, "audit": audit})
           PY
+      - name: Standardize TMFR1 5-minute dataset and create provenance manifest
+        if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
+        run: |
+          mkdir -p build/datasets
+          python scripts/standardize_csv.py TMFR1_5min_2024-2025.csv \\
+            --output build/datasets/tmfr1_5m_2024-2025_standard.csv \\
+            --manifest build/datasets/tmfr1_5m_2024-2025_manifest.json \\
+            --timeframe 5m
+      - name: Upload canonical dataset and manifest
+        if: hashFiles('build/datasets/tmfr1_5m_2024-2025_standard.csv') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmfr1-standard-dataset-v1
+          path: build/datasets/*
+          if-no-files-found: error
       - name: Audit expiry-window continuous-series proxies (not roll spreads)
         if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
         run: python scripts/audit_roll_proxies.py TMFR1_5min_2024-2025.csv --output tmfr1_expiry_window_audit.json
