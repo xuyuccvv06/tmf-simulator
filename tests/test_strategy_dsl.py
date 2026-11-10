@@ -41,3 +41,13 @@ def test_run_dsl_strategy_uses_existing_simulator():
     result = run_dsl_strategy(data, spec(), round_trip_cost_points=5.3)
     assert result["signal_count"] == 1
     assert len(result["trades"]) == 1
+def test_unknown_fields_are_rejected_at_every_level():
+    bad = spec(); bad["python"] = "print('unsafe')"
+    with pytest.raises(ValueError, match="top-level"):
+        compile_strategy(bad)
+    bad = spec(); bad["indicators"]["trend"]["expression"] = "__import__('os')"
+    with pytest.raises(ValueError, match="unsupported indicator fields"):
+        compile_strategy(bad)
+    bad = spec(); bad["risk"]["trailing_stop"] = True
+    with pytest.raises(ValueError, match="unsupported fields"):
+        compile_strategy(bad)
