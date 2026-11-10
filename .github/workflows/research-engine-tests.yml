@@ -19,6 +19,9 @@ jobs:
       - name: Profile checked-in TMFR1 CSV (read-only)
         if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
         run: python scripts/profile_csv.py TMFR1_5min_2024-2025.csv > tmfr1_csv_profile.json
+      - name: Strictly load and validate checked-in TMFR1 CSV
+        if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
+        run: python -c "from datetime import timedelta; from research_engine import load_bars_csv, audit_bars; bars=load_bars_csv('TMFR1_5min_2024-2025.csv'); audit=audit_bars(bars, expected_interval=timedelta(minutes=5)); assert len(bars)==79689, f'unexpected row count: {len(bars)}'; assert not audit.validation_errors, audit.validation_errors; print(audit)"
       - name: Upload TMFR1 CSV profile
         if: hashFiles('tmfr1_csv_profile.json') != ''
         uses: actions/upload-artifact@v4
