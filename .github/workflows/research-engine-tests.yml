@@ -25,12 +25,21 @@ jobs:
           python - <<'PY'
           from datetime import timedelta
           from research_engine import load_bars_csv, audit_bars
+          from research_engine.session_audit import classify_tmfr1_interval
 
           bars = load_bars_csv("TMFR1_5min_2024-2025.csv")
           audit = audit_bars(bars, expected_interval=timedelta(minutes=5))
           assert len(bars) == 79689, f"unexpected row count: {len(bars)}"
           assert not audit.validation_errors, audit.validation_errors
-          print(audit)
+          classes = {}
+          unexpected = []
+          for previous, current in zip(bars, bars[1:]):
+              label = classify_tmfr1_interval(previous.timestamp, current.timestamp)
+              classes[label] = classes.get(label, 0) + 1
+              if label == "unexpected_interval":
+                  unexpected.append((previous.timestamp, current.timestamp))
+          assert not unexpected, f"unexpected intervals found: {unexpected[:20]}"
+          print({"rows": len(bars), "interval_classes": classes, "audit": audit})
           PY
       - name: Upload TMFR1 CSV profile
         if: hashFiles('tmfr1_csv_profile.json') != ''
