@@ -35,6 +35,15 @@ def classify_overnight_gap(
     if current <= previous:
         raise ValueError("current timestamp must follow previous timestamp")
 
+    if previous.date() == current.date():
+        return {
+            "classification": "regular_overnight_break",
+            "intervening_dates": [],
+            "official_closure_dates": [],
+            "weekend_dates": [],
+            "unverified_weekdays": [],
+        }
+
     days = []
     day = previous.date() + timedelta(days=1)
     while day < current.date():
