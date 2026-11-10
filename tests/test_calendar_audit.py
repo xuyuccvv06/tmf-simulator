@@ -5,8 +5,12 @@ from research_engine.calendar_audit import classify_overnight_gap, load_closures
 
 def test_loads_source_linked_closure_calendar():
     closures = load_closures("data/calendars/taifex_market_closures_2024_2025.csv")
+    assert date(2024, 10, 3) in closures
+    assert date(2024, 10, 10) in closures
     assert date(2024, 10, 31) in closures
     assert date(2025, 1, 23) in closures
+    assert date(2025, 1, 24) in closures
+    assert len(closures) == 23
     assert date(2025, 12, 25) in closures
 
 
