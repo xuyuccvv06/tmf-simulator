@@ -1,7 +1,7 @@
 import csv, json
 from pathlib import Path
 import pytest
-from scripts.dataset_registry import register_dataset, validate_dataset
+from research_engine.dataset_registry import register_dataset, validate_dataset
 
 def make_files(tmp_path):
     csv_path = tmp_path / "standard.csv"
