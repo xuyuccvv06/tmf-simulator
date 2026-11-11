@@ -14,7 +14,7 @@ const sandbox = {
   Date, Set, Number
 };
 vm.createContext(sandbox);
-vm.runInContext(helpers + "\\nglobalThis.api = { eventVoided, periodBounds, effectiveExitPnl, completedTrades };", sandbox);
+vm.runInContext(helpers + "\nglobalThis.api = { eventVoided, periodBounds, effectiveExitPnl, completedTrades };", sandbox);
 const api = sandbox.api;
 const event = (entry_id, event_type, extra = {}) => ({
   entry_id, event_type, trade_id: "T1",
