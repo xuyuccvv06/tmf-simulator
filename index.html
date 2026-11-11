@@ -73,6 +73,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
   <div class="stat"><small>浮動損益（點）</small><b id="unrealized">0.0</b></div>
   <div class="stat"><small>停損價</small><b id="stopPrice">—</b></div>
   <div class="stat"><small>停利價</small><b id="targetPrice">—</b></div>
+  <div class="stat"><small>目前收盤</small><b id="tradeCurrentClose">—</b></div>
  </div>
  <div class="trade-record" style="margin-top:10px">
   <div><label for="stopLossPoints">停損距離（點，可留空）</label><input id="stopLossPoints" type="number" min="0" step="0.1" inputmode="decimal" placeholder="不設定"></div>
@@ -245,6 +246,7 @@ function updateTradeUI(){
  $('entryPrice').textContent=position?position.entry.toLocaleString('en-US'):'—';
  $('stopPrice').textContent=position&&position.stopLoss!==null?position.stopLoss.toLocaleString('en-US'):'—';
  $('targetPrice').textContent=position&&position.takeProfit!==null?position.takeProfit.toLocaleString('en-US'):'—';
+ $('tradeCurrentClose').textContent=last?last.c.toLocaleString('en-US'):'—';
  if(position){
   const risk=position.stopLoss===null?'未設定停損':'停損 '+position.stopLoss.toLocaleString('en-US');
   const reward=position.takeProfit===null?'未設定停利':'停利 '+position.takeProfit.toLocaleString('en-US');
