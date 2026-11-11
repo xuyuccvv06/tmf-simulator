@@ -78,7 +78,7 @@ try{const saved=localStorage.getItem(KEY);if(saved){const parsed=JSON.parse(save
 function save(){localStorage.setItem(KEY,JSON.stringify(db));render();}
 function id(prefix){return prefix+"_"+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));}
 function nowLocal(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16);}
-function event(type,narrative,tradeId=null,extra={}){return {journal_version:"1.0.0",entry_id:id("jrn"),event_type:type,recorded_at:new Date().toISOString(),market_timestamp:extra.market_timestamp||null,trade_id:tradeId,narrative,context:extra.context||{},attachments:[]};}
+function event(type,narrative,tradeId=null,extra={}){const entered=extra.recorded_at?new Date(extra.recorded_at):new Date();return {journal_version:"1.0.0",entry_id:id("jrn"),event_type:type,recorded_at:entered.toISOString(),market_timestamp:extra.market_timestamp||null,trade_id:tradeId,narrative,context:extra.context||{},attachments:[]};}
 function eventsFor(tid){return db.events.filter(e=>e.trade_id===tid);}
 function allowed(tid,type){
  const types=eventsFor(tid).map(e=>e.event_type);
