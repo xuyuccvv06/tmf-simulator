@@ -29,7 +29,7 @@ label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}input,se
 <section class="panel">
 <h2>資料備份</h2>
 <p>紀錄目前只保存在這台裝置、這個瀏覽器。清除瀏覽器資料可能導致紀錄遺失。</p>
-<div class="actions"><button class="primary" id="exportData">匯出備份 JSON</button><button id="importButton">匯入備份 JSON</button><input class="hidden" type="file" id="importFile" accept="application/json,.json"></div>\n<label for="datasetFile">載入標準化 TMFR1 CSV</label><input id="datasetFile" type="file" accept=".csv,text/csv"><div class="muted" id="datasetStatus">僅接受標準欄位 CSV；上傳後計算 SHA-256 並驗證時間戳。</div>\n<div class="muted" id="backupStatus">建議每次交易日結束後匯出備份。</div>
+<div class="actions"><button class="primary" id="exportData">匯出備份 JSON</button><button id="importButton">匯入備份 JSON</button><input class="hidden" type="file" id="importFile" accept="application/json,.json"></div>\n<label for="datasetFile">載入標準化 TMFR1 CSV</label><input id="datasetFile" type="file" accept=".csv,text/csv"><div class="muted" id="datasetStatus">僅接受標準欄位 CSV；載入後會保存至此瀏覽器的 IndexedDB。</div><div class="muted" id="datasetPersistStatus"></div>\n<div class="muted" id="backupStatus">建議每次交易日結束後匯出備份。</div>
 </section>
 <section class="panel">
 <div class="section-head"><h2>交易清單</h2><span class="tag" id="tradeCount">0 筆</span></div>
@@ -56,9 +56,9 @@ label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}input,se
 <label for="endTime">行情區間終點</label><input id="endTime" type="datetime-local">
 <p class="muted">載入 CSV 後會檢查起訖時間是否精確存在於資料中。此頁不會上傳 CSV 到伺服器。</p>
 </details>
-<div class="actions"><button class="primary" id="appendEvent">保存事件</button></div>
+<label for="attachmentFiles">附加截圖或檔案（選填）</label><input id="attachmentFiles" type="file" accept="image/*,video/*,.pdf,.txt,.csv" multiple><div class="muted">附件保存在本機 IndexedDB，不會自動上傳。</div><div class="actions"><button class="primary" id="appendEvent">保存事件</button></div>
 <div id="eventStatus" class="status" role="status"></div>
-<div class="timeline" id="timeline"></div>
+<div class="panel" style="margin-top:14px;padding:10px"><div class="section-head"><h2>行情回看</h2><span class="muted" id="chartStatus">選擇已關聯行情的事件後顯示</span></div><canvas id="marketChart" height="260" style="width:100%;height:260px;display:block"></canvas></div><div class="timeline" id="timeline"></div>
 </div>
 </section>
 <section class="panel wide">
@@ -72,9 +72,51 @@ label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}input,se
 const KEY="tmf.behaviourJournal.v1";
 const $=id=>document.getElementById(id);
 const labels={pre_trade:"交易前觀察",entry:"進場",management:"持倉管理",exit:"出場",post_trade:"事後回顧",observation:"一般盤面觀察"};
-let db={version:1,events:[]},selected=null,activeDataset=null;
+let db={version:1,events:[]},selected=null,activeDataset=null,loadedBars=[];\nconst DB_NAME="tmf-journal-store-v1";let idb=null;
 try{const saved=localStorage.getItem(KEY);if(saved){const parsed=JSON.parse(saved);if(parsed&&parsed.version===1&&Array.isArray(parsed.events))db=parsed;}}catch(e){$("backupStatus").textContent="讀取本機紀錄失敗，請勿覆蓋；可嘗試匯入先前備份。";}
-function save(){localStorage.setItem(KEY,JSON.stringify(db));render();}
+function save(){localStorage.setItem(KEY,JSON.stringify(db));render();drawChart();}\nfunction openStore(){
+ return new Promise((resolve,reject)=>{
+  const req=indexedDB.open(DB_NAME,1);
+  req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains("datasets"))d.createObjectStore("datasets",{keyPath:"dataset_id"});if(!d.objectStoreNames.contains("attachments"))d.createObjectStore("attachments",{keyPath:"attachment_id"});};
+  req.onsuccess=()=>{idb=req.result;resolve(idb);};req.onerror=()=>reject(req.error);
+ });
+}
+function storePut(store,value){return new Promise((resolve,reject)=>{const tx=idb.transaction(store,"readwrite");tx.objectStore(store).put(value);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
+function storeGet(store,key){return new Promise((resolve,reject)=>{const req=idb.transaction(store,"readonly").objectStore(store).get(key);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
+function storeAll(store){return new Promise((resolve,reject)=>{const req=idb.transaction(store,"readonly").objectStore(store).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);});}
+async function restoreDatasets(){
+ const records=await storeAll("datasets");
+ $("datasetPersistStatus").textContent=records.length?"已保存 "+records.length+" 份行情資料集；選取後可直接回看，不必重新上傳。":"尚無已保存行情資料集。";
+ if(records.length){activeDataset=records[records.length-1].meta;loadedBars=records[records.length-1].bars||[];}
+}
+async function storeAttachment(file,eventId){
+ const attachment={attachment_id:id("att"),event_id:eventId,name:file.name,type:file.type||"application/octet-stream",size:file.size,last_modified:file.lastModified,blob:file};
+ await storePut("attachments",attachment);return {attachment_id:attachment.attachment_id,name:attachment.name,type:attachment.type,size:attachment.size};
+}
+function drawChart(){
+ const canvas=$("marketChart");if(!canvas)return;
+ const ctx=canvas.getContext("2d"),w=canvas.clientWidth||600,h=260,dpr=window.devicePixelRatio||1;
+ canvas.width=w*dpr;canvas.height=h*dpr;ctx.scale(dpr,dpr);ctx.fillStyle="#0e151e";ctx.fillRect(0,0,w,h);
+ if(!loadedBars.length){$("chartStatus").textContent="尚未載入行情資料";return;}
+ const evs=eventsFor(selected||"");const refEvent=[...evs].reverse().find(e=>e.context&&e.context.market_reference);
+ if(!refEvent){$("chartStatus").textContent="此交易尚未關聯行情區間";return;}
+ const ref=refEvent.context.market_reference;
+ if(!activeDataset||activeDataset.dataset_id!==ref.dataset_id){$("chartStatus").textContent="請從已保存資料集中載入 "+ref.dataset_id;return;}
+ let bars=loadedBars.filter(b=>Date.parse(b.timestamp)>=Date.parse(ref.start_timestamp)&&Date.parse(b.timestamp)<=Date.parse(ref.end_timestamp));
+ if(!bars.length){$("chartStatus").textContent="關聯時間區間沒有 K 線";return;}
+ if(bars.length>180){const step=Math.ceil(bars.length/180);bars=bars.filter((_,i)=>i%step===0||i===bars.length-1);}
+ const min=Math.min(...bars.map(b=>b.low)),max=Math.max(...bars.map(b=>b.high)),range=max-min||1;
+ const pad={l:12,r:48,t:12,b:24},cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
+ const y=v=>pad.t+(max-v)/range*ch,x=i=>pad.l+(i+.5)*cw/bars.length;
+ ctx.strokeStyle="#263547";ctx.lineWidth=1;ctx.fillStyle="#9aaabd";ctx.font="10px sans-serif";
+ for(let j=0;j<=4;j++){const val=max-range*j/4,yy=y(val);ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(w-pad.r,yy);ctx.stroke();ctx.fillText(val.toFixed(1),w-pad.r+4,yy+3);}
+ const bodyW=Math.max(2,Math.min(8,cw/bars.length*.62));
+ bars.forEach((b,i)=>{const up=b.close>=b.open;ctx.strokeStyle=up?"#54c995":"#ef7777";ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.moveTo(x(i),y(b.high));ctx.lineTo(x(i),y(b.low));ctx.stroke();const top=y(Math.max(b.open,b.close)),bh=Math.max(1,Math.abs(y(b.open)-y(b.close)));ctx.fillRect(x(i)-bodyW/2,top,bodyW,bh);});
+ const markers=evs.filter(e=>e.market_timestamp&&["entry","exit"].includes(e.event_type));
+ markers.forEach(e=>{const idx=bars.findIndex(b=>Date.parse(b.timestamp)===Date.parse(e.market_timestamp));if(idx<0)return;const b=bars[idx],yy=e.event_type==="entry"?y(b.low)+10:y(b.high)-10;ctx.fillStyle=e.event_type==="entry"?"#79b8ff":"#f2c879";ctx.beginPath();ctx.arc(x(idx),yy,5,0,Math.PI*2);ctx.fill();ctx.fillStyle="#edf3fa";ctx.fillText(e.event_type==="entry"?"進":"出",x(idx)-4,yy-9);});
+ $("chartStatus").textContent=bars.length+" 根 K 線 · "+ref.timeframe+" · 進/出場標記依事件行情時間";
+}
+
 function id(prefix){return prefix+"_"+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));}
 function nowLocal(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16);}
 function parseCSV(text){
@@ -101,7 +143,7 @@ async function loadCanonicalDataset(file){
  if(rows.length<2)throw new Error("CSV 沒有資料列");
  const expected=["timestamp","trading_date","product_id","timeframe","open","high","low","close","volume"];
  if(JSON.stringify(rows[0].map(x=>x.trim()))!==JSON.stringify(expected))throw new Error("欄位或欄位順序不符合標準資料集 V1");
- const timestamps=new Set(),products=new Set(),frames=new Set();let first=null,last=null,count=0,previous=-Infinity;
+ const timestamps=new Set(),products=new Set(),frames=new Set(),bars=[];let first=null,last=null,count=0,previous=-Infinity;
  for(let i=1;i<rows.length;i++){
   const r=rows[i];if(r.length!==expected.length)throw new Error("第 "+(i+1)+" 列欄位數錯誤");
   if(r.every(x=>!String(x).trim()))throw new Error("第 "+(i+1)+" 列為空白列");
@@ -112,12 +154,12 @@ async function loadCanonicalDataset(file){
   for(const j of [4,5,6,7,8])if(!Number.isFinite(Number(r[j]))||r[j].trim()==="")throw new Error("第 "+(i+1)+" 列含非數字 OHLCV");
   const [o,h,l,cl,v]=[4,5,6,7,8].map(j=>Number(r[j]));
   if(Math.min(o,h,l,cl)<=0||l>Math.min(o,cl)||h<Math.max(o,cl)||v<0)throw new Error("第 "+(i+1)+" 列 OHLCV 邏輯錯誤");
-  first=first||ts;last=ts;count++;
+  first=first||ts;last=ts;count++;bars.push({timestamp:ts,open:o,high:h,low:l,close:cl,volume:v});
  }
  if(products.size!==1||frames.size!==1)throw new Error("資料集混有不同商品或週期");
  const digest=await crypto.subtle.digest("SHA-256",await file.arrayBuffer());
  const hash=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("");
- return {dataset_id:"ds_"+hash.slice(0,16),dataset_sha256:hash,timeframe:[...frames][0],product_id:[...products][0],row_count:count,first_timestamp:first,last_timestamp:last,timestamps};
+ return {meta:{dataset_id:"ds_"+hash.slice(0,16),dataset_sha256:hash,timeframe:[...frames][0],product_id:[...products][0],row_count:count,first_timestamp:first,last_timestamp:last},timestamps,bars};
 }
 function event(type,narrative,tradeId=null,extra={}){const entered=extra.recorded_at?new Date(extra.recorded_at):new Date();return {journal_version:"1.0.0",entry_id:id("jrn"),event_type:type,recorded_at:entered.toISOString(),market_timestamp:extra.market_timestamp||null,trade_id:tradeId,narrative,context:extra.context||{},attachments:[]};}
 function eventsFor(tid){return db.events.filter(e=>e.trade_id===tid);}
@@ -140,7 +182,7 @@ function render(){
   const card=document.createElement("button");card.className="trade"+(selected===tid?" active":"");card.style.width="100%";card.style.textAlign="left";
   const h=document.createElement("h3");h.textContent=first.context.title||tid;
   const small=document.createElement("small");small.textContent=s.types.length+" 個事件 · "+(s.complete?"已完成回顧":"紀錄進行中")+" · "+new Date(last.recorded_at).toLocaleString();
-  card.append(h,small);card.onclick=()=>{selected=tid;render();};$("tradeList").append(card);
+  card.append(h,small);card.onclick=()=>{selected=tid;render();drawChart();};$("tradeList").append(card);
  });
  $("noSelection").classList.toggle("hidden",!!selected);
  $("selectedTrade").classList.toggle("hidden",!selected);
@@ -154,7 +196,7 @@ function render(){
   const p=document.createElement("p");p.textContent=e.narrative;
   item.append(strong,time,p);
   if(e.market_timestamp){const m=document.createElement("small");m.textContent="行情時間："+e.market_timestamp;item.append(m);}
-  if(e.context.market_reference){const m=document.createElement("small");m.textContent="資料集："+e.context.market_reference.dataset_id+" · "+e.context.market_reference.timeframe;item.append(m);}
+  if(e.context.market_reference){const m=document.createElement("small");m.textContent="資料集："+e.context.market_reference.dataset_id+" · "+e.context.market_reference.timeframe;item.append(m);}\n  if(e.attachments&&e.attachments.length){const wrap=document.createElement("div");wrap.className="actions";e.attachments.forEach(a=>{const b=document.createElement("button");b.textContent="附件："+a.name;b.onclick=async()=>{const saved=await storeGet("attachments",a.attachment_id);if(!saved){alert("找不到附件，請確認是否已匯入附件備份。");return;}const url=URL.createObjectURL(saved.blob);const link=document.createElement("a");link.href=url;link.download=saved.name;link.target="_blank";link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);};wrap.append(b);});item.append(wrap);}
   $("timeline").append(item);
  });
 }
@@ -176,7 +218,7 @@ $("datasetFile").onchange=async ev=>{
   activeDataset=loaded;
   $("datasetId").value=loaded.dataset_id;$("datasetHash").value=loaded.dataset_sha256;
   $("timeframe").value=loaded.timeframe;
-  $("datasetStatus").textContent="已載入 "+loaded.product_id+" · "+loaded.timeframe+" · "+loaded.row_count.toLocaleString()+" 列 · SHA-256 "+loaded.dataset_sha256.slice(0,16)+"…";
+  loadedBars=loaded.bars||[];\n  $("datasetStatus").textContent="已載入 "+loaded.product_id+" · "+loaded.timeframe+" · "+loaded.row_count.toLocaleString()+" 列 · SHA-256 "+loaded.dataset_sha256.slice(0,16)+"…";
  }catch(err){activeDataset=null;$("datasetStatus").textContent="載入失敗："+err.message;alert("CSV 載入失敗："+err.message);}
  finally{ev.target.value="";}
 };
