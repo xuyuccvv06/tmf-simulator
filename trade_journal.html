@@ -273,7 +273,11 @@ $("importFile").onchange=async e=>{
   for(const ev of incoming){
    if(!ev||typeof ev.entry_id!=="string"||!labels[ev.event_type]||typeof ev.recorded_at!=="string"||!Number.isFinite(Date.parse(ev.recorded_at))||typeof ev.narrative!=="string"||!ev.narrative.trim())throw Error("備份內含格式錯誤的事件");
    if(incomingIds.has(ev.entry_id))throw Error("備份內有重複事件 ID");incomingIds.add(ev.entry_id);
+   if(ev.event_type==="exit"&&ev.context?.realized_pnl_twd!==undefined&&(typeof ev.context.realized_pnl_twd!=="number"||!Number.isFinite(ev.context.realized_pnl_twd)))throw Error("出場淨損益必須是有效數字");
+   if(ev.event_type==="amendment"&&ev.context?.amendment_kind==="pnl_correction"&&(typeof ev.context.corrected_realized_pnl_twd!=="number"||!Number.isFinite(ev.context.corrected_realized_pnl_twd)||typeof ev.target_entry_id!=="string"||!ev.target_entry_id))throw Error("損益修正紀錄格式錯誤");
   }
+  for(const ev of incoming)if(ev.event_type==="amendment"&&ev.context?.amendment_kind==="pnl_correction"){const target=incoming.find(x=>x.entry_id===ev.target_entry_id);if(!target||target.event_type!=="exit"||target.trade_id!==ev.trade_id)throw Error("損益修正找不到同一筆交易的原始出場紀錄");}
+  for(const ev of incoming)if(ev.event_type==="void"&&(!ev.target_entry_id||!incoming.some(x=>x.entry_id===ev.target_entry_id&&x.trade_id===ev.trade_id)))throw Error("作廢事件引用的原始紀錄不存在");
   const datasetIds=new Set();for(const ds of b.datasets){validateDatasetRecord(ds);if(datasetIds.has(ds.meta.dataset_id))throw Error("備份內有重複資料集 ID");datasetIds.add(ds.meta.dataset_id);}
   const attachmentIds=new Set(),decoded=[];
   for(const a of b.attachments){
@@ -284,6 +288,8 @@ $("importFile").onchange=async e=>{
   }
   for(const ev of incoming)for(const a of (ev.attachments||[]))if(!attachmentIds.has(a.attachment_id)&&!await get("attachments",a.attachment_id))throw Error("事件引用的附件不存在："+a.name);
   const additions=incoming.filter(x=>!ids.has(x.entry_id));
+  const incomingById=new Map(incoming.map(x=>[x.entry_id,x]));
+  for(const ev of additions)if(ev.event_type==="amendment"&&ev.context?.amendment_kind==="pnl_correction"&&!ids.has(ev.target_entry_id)&&!incomingById.has(ev.target_entry_id))throw Error("損益修正缺少原始出場紀錄，已中止匯入");
   const packedForImport=[],chunksForImport=[];
   for(const source of b.datasets){const packed=chunkDataset(source);packedForImport.push(packed.dataset);chunksForImport.push(...packed.chunks);}
   await atomicImport(packedForImport,chunksForImport,decoded);
