@@ -245,6 +245,11 @@ function updateTradeUI(){
  $('entryPrice').textContent=position?position.entry.toLocaleString('en-US'):'—';
  $('stopPrice').textContent=position&&position.stopLoss!==null?position.stopLoss.toLocaleString('en-US'):'—';
  $('targetPrice').textContent=position&&position.takeProfit!==null?position.takeProfit.toLocaleString('en-US'):'—';
+ if(position){
+  const risk=position.stopLoss===null?'未設定停損':'停損 '+position.stopLoss.toLocaleString('en-US');
+  const reward=position.takeProfit===null?'未設定停利':'停利 '+position.takeProfit.toLocaleString('en-US');
+  $('orderStatus').textContent=`${position.side}單持倉中：${position.entry.toLocaleString('en-US')} 點（${position.entryTime}）｜${risk}｜${reward}`;
+ }
  const u=position&&last?(last.c-position.entry)*(position.side==='多'?1:-1):0;
  $('unrealized').textContent=(u>=0?'+':'')+u.toFixed(1);
  $('unrealized').style.color=u>0?'#f06468':u<0?'#20c887':'#edf4fa';
