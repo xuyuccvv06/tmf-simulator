@@ -1,0 +1,95 @@
+name: Research engine tests
+
+on:
+  push:
+    branches: ["tmf-research-platform-v0.1"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e ".[test]"
+      - run: python -m pytest -q
+      - name: Validate all checked-in HTML inline JavaScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          files = sorted(Path(".").glob("*.html"))
+          assert files, "no HTML files found"
+          for path in files:
+              html = path.read_text(encoding="utf-8")
+              scripts = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>", html, flags=re.S | re.I)
+              for index, script in enumerate(scripts):
+                  target = Path("/tmp") / f"{path.stem}_{index}.js"
+                  target.write_text(script, encoding="utf-8")
+                  print(f"checking {path} inline script {index + 1}")
+          PY
+          for script in /tmp/index*.js /tmp/trade_journal*.js; do
+            [ -f "$script" ] && node --check "$script"
+          done
+      - name: Test trade journal statistics and audit behavior
+        run: node --test tests/trade_journal_stats.test.cjs
+      - name: Profile checked-in TMFR1 CSV (read-only)
+        if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
+        run: python scripts/profile_csv.py TMFR1_5min_2024-2025.csv > tmfr1_csv_profile.json
+      - name: Strictly load and validate checked-in TMFR1 CSV
+        if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
+        run: |
+          python - <<'PY'
+          from datetime import timedelta
+          from research_engine import load_bars_csv, audit_bars
+          from research_engine.session_audit import classify_tmfr1_interval
+          bars = load_bars_csv("TMFR1_5min_2024-2025.csv")
+          audit = audit_bars(bars, expected_interval=timedelta(minutes=5))
+          assert len(bars) == 79689, f"unexpected row count: {len(bars)}"
+          assert not audit.validation_errors, audit.validation_errors
+          classes = {}
+          unexpected = []
+          for previous, current in zip(bars, bars[1:]):
+              label = classify_tmfr1_interval(previous.timestamp, current.timestamp)
+              classes[label] = classes.get(label, 0) + 1
+              if label == "unexpected_interval":
+                  unexpected.append((previous.timestamp, current.timestamp))
+          assert not unexpected, f"unexpected intervals found: {unexpected[:20]}"
+          print({"rows": len(bars), "interval_classes": classes, "audit": audit})
+          PY
+      - name: Standardize TMFR1 5-minute dataset and create provenance manifest
+        if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
+        run: |
+          mkdir -p build/datasets
+          python scripts/standardize_csv.py TMFR1_5min_2024-2025.csv --output build/datasets/tmfr1_5m_2024-2025_standard.csv --manifest build/datasets/tmfr1_5m_2024-2025_manifest.json --timeframe 5m
+      - name: Register canonical dataset in append-only registry
+        if: hashFiles('build/datasets/tmfr1_5m_2024-2025_standard.csv') != ''
+        run: |
+          python scripts/register_dataset.py --csv build/datasets/tmfr1_5m_2024-2025_standard.csv --manifest build/datasets/tmfr1_5m_2024-2025_manifest.json --registry build/datasets/registry.json
+      - name: Upload canonical dataset, manifest, and registry
+        if: hashFiles('build/datasets/tmfr1_5m_2024-2025_standard.csv') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmfr1-standard-dataset-v1
+          path: build/datasets/*
+          if-no-files-found: error
+      - name: Audit expiry-window continuous-series proxies (not roll spreads)
+        if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
+        run: python scripts/audit_roll_proxies.py TMFR1_5min_2024-2025.csv --output tmfr1_expiry_window_audit.json
+      - name: Upload expiry-window audit
+        if: hashFiles('tmfr1_expiry_window_audit.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmfr1-expiry-window-audit
+          path: tmfr1_expiry_window_audit.json
+          if-no-files-found: error
+      - name: Upload TMFR1 CSV profile
+        if: hashFiles('tmfr1_csv_profile.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmfr1-csv-profile
+          path: tmfr1_csv_profile.json
+          if-no-files-found: error

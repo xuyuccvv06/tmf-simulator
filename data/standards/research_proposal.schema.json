@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TMF Research Proposal",
+  "type": "object",
+  "required": ["artifact_type", "experiment_id", "strategy_id", "strategy_version", "status", "hypothesis", "market_mechanism", "entry_rules", "exit_rules", "invalidation_rules", "parameter_search_space"],
+  "properties": {
+    "artifact_type": {"const": "research_proposal"},
+    "experiment_id": {"type": "string", "minLength": 1},
+    "strategy_id": {"type": "string", "minLength": 1},
+    "strategy_version": {"type": "string", "minLength": 1},
+    "status": {"enum": ["draft", "ready_for_adversarial_review"]},
+    "hypothesis": {"type": "string", "minLength": 1},
+    "market_mechanism": {"type": "string", "minLength": 1},
+    "entry_rules": {"type": "string", "minLength": 1},
+    "exit_rules": {"type": "string", "minLength": 1},
+    "invalidation_rules": {"type": "string", "minLength": 1},
+    "parameter_search_space": {"type": "object", "minProperties": 1},
+    "data_requirements": {"type": "array", "items": {"type": "string"}},
+    "known_risks": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}
