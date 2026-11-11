@@ -95,7 +95,14 @@ async function readDataset(file){
 }
 function tradeEvents(tid){return db.events.filter(e=>e.trade_id===tid);}
 function permitted(tid,type){const t=tradeEvents(tid).map(e=>e.event_type);if(type==="pre_trade")return !t.includes("entry");if(type==="entry")return !t.includes("entry")&&!t.includes("exit")&&!t.includes("post_trade");if(type==="management")return t.includes("entry")&&!t.includes("exit")&&!t.includes("post_trade");if(type==="exit")return t.includes("entry")&&!t.includes("exit")&&!t.includes("post_trade");if(type==="post_trade")return t.includes("exit")&&!t.includes("post_trade");return false;}
-function eventVoided(eventId,events){return events.some(e=>e.event_type==="void"&&e.target_entry_id===eventId);}
+function eventVoided(eventId,events){
+ const voided=new Set();
+ for(const event of events){
+  if(event.event_type!=="void"||voided.has(event.entry_id))continue;
+  if(typeof event.target_entry_id==="string")voided.add(event.target_entry_id);
+ }
+ return voided.has(eventId);
+}
 function periodBounds(period,now=new Date()){
  const start=new Date(now.getFullYear(),now.getMonth(),now.getDate()),end=new Date(start);
  if(period==="week"){start.setDate(start.getDate()-(start.getDay()+6)%7);end.setTime(start.getTime());end.setDate(end.getDate()+7);}
