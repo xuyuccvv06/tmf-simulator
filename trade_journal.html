@@ -21,7 +21,23 @@ try{const s=JSON.parse(localStorage.getItem(KEY)||"null");if(s&&s.version===1&&A
 function uid(p){return p+"_"+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));}
 function persist(){localStorage.setItem(KEY,JSON.stringify(db));render();drawChart();}
 function openDB(){return new Promise((resolve,reject)=>{const q=indexedDB.open(DB_NAME,1);q.onupgradeneeded=()=>{const d=q.result;if(!d.objectStoreNames.contains("datasets"))d.createObjectStore("datasets",{keyPath:"dataset_id"});if(!d.objectStoreNames.contains("attachments"))d.createObjectStore("attachments",{keyPath:"attachment_id"});};q.onsuccess=()=>{idb=q.result;resolve(idb);};q.onerror=()=>reject(q.error);});}
-function put(store,value){return new Promise((resolve,reject)=>{const tx=idb.transaction(store,"readwrite");tx.objectStore(store).put(value);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
+function put(store,value){return new Promise((resolve,reject)=>{const tx=idb.transaction(store,"readwrite");tx.objectStore(store).put(value);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error("IndexedDB transaction aborted"));});}
+function atomicImport(datasets,attachments){
+ return new Promise((resolve,reject)=>{
+  let tx;
+  try{tx=idb.transaction(["datasets","attachments"],"readwrite");}
+  catch(err){reject(err);return;}
+  tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error("備份匯入交易失敗"));tx.onabort=()=>reject(tx.error||new Error("備份匯入已中止"));
+  const ds=tx.objectStore("datasets"),at=tx.objectStore("attachments");
+  datasets.forEach(x=>ds.put(x));attachments.forEach(x=>at.put(x));
+ });
+}
+async function updateStorageStatus(){
+ try{
+  if(navigator.storage?.persist){const persisted=await navigator.storage.persist();$("storageStatus").dataset.persisted=String(persisted);}
+  if(navigator.storage?.estimate){const e=await navigator.storage.estimate(),used=e.usage||0,quota=e.quota||0,mb=n=>(n/1024/1024).toFixed(1);$("storageStatus").textContent="本機儲存使用 "+mb(used)+" MB / "+(quota?mb(quota)+" MB":"容量未知")+" · "+( $("storageStatus").dataset.persisted==="true"?"已取得持久儲存權限":"瀏覽器仍可能依空間政策清理資料");}
+ }catch(err){$("storageStatus").textContent="無法取得瀏覽器儲存空間資訊："+err.message;}
+}
 function get(store,key){return new Promise((resolve,reject)=>{const q=idb.transaction(store,"readonly").objectStore(store).get(key);q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});}
 function all(store){return new Promise((resolve,reject)=>{const q=idb.transaction(store,"readonly").objectStore(store).getAll();q.onsuccess=()=>resolve(q.result||[]);q.onerror=()=>reject(q.error);});}
 async function restoreDataset(preferredId=null){
@@ -34,7 +50,7 @@ async function restoreDataset(preferredId=null){
   select.value=chosen.meta.dataset_id;activeDataset=chosen.meta;loadedBars=chosen.bars;
   $("datasetStatus").textContent="已選擇 "+chosen.meta.product_id+" · "+chosen.meta.timeframe+" · "+chosen.meta.row_count.toLocaleString()+" 根";
  }
- $("storageStatus").textContent="本機已保存 "+list.length+" 份行情資料集。";
+ $("storageStatus").textContent="本機已保存 "+list.length+" 份行情資料集。";await updateStorageStatus();
 }
 $("datasetSelect").onchange=async()=>{const d=await get("datasets",$("datasetSelect").value);if(!d)return;activeDataset=d.meta;loadedBars=d.bars;$("datasetStatus").textContent="已切換 "+d.meta.product_id+" · "+d.meta.timeframe+" · "+d.meta.row_count.toLocaleString()+" 根";drawChart();};
 function parseCSV(s){const rows=[];let row=[],v="",q=false;for(let i=0;i<s.length;i++){const ch=s[i];if(q){if(ch==='"'&&s[i+1]==='"'){v+='"';i++;}else if(ch==='"')q=false;else v+=ch;}else if(ch==='"'){if(v)throw Error("CSV 引號位置錯誤");q=true;}else if(ch===","){row.push(v);v="";}else if(ch==="\n"){row.push(v.replace(/\r$/,""));rows.push(row);row=[];v="";}else v+=ch;}if(q)throw Error("CSV 引號未關閉");if(v||row.length){row.push(v.replace(/\r$/,""));rows.push(row);}return rows;}
@@ -121,7 +137,7 @@ function decodeDataURL(url){const parts=url.split(","),mime=(parts[0].match(/dat
 $("exportData").onclick=async()=>{
  try{$("backupStatus").textContent="正在整理完整備份…";const datasets=await all("datasets"),stored=await all("attachments"),attachments=[];
  for(const a of stored)attachments.push({attachment_id:a.attachment_id,event_id:a.event_id,name:a.name,type:a.type,size:a.size,blob_data_url:await blobDataURL(a.blob)});
- const bundle={backup_format:"tmf-journal-full-v1",created_at:new Date().toISOString(),journal:db,datasets,attachments};
+ const bundle={backup_format:"tmf-journal-full-v1",created_at:new Date().toISOString(),journal:db,datasets,attachments,manifest:{event_count:db.events.length,dataset_count:datasets.length,attachment_count:attachments.length,total_dataset_bars:datasets.reduce((n,d)=>n+(d.bars?.length||0),0)}};
  const blob=new Blob([JSON.stringify(bundle)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="tmf-full-backup-"+new Date().toISOString().slice(0,10)+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
  $("backupStatus").textContent="完整備份已匯出：事件 "+db.events.length+" 筆、行情 "+datasets.length+" 份、附件 "+attachments.length+" 個。";
  }catch(err){$("backupStatus").textContent="備份失敗："+err.message;alert("備份失敗："+err.message);}
@@ -139,14 +155,24 @@ $("importFile").onchange=async e=>{
  try{
   const b=JSON.parse(await file.text());
   if(b.backup_format!=="tmf-journal-full-v1"||!b.journal||b.journal.version!==1||!Array.isArray(b.journal.events)||!Array.isArray(b.datasets)||!Array.isArray(b.attachments))throw Error("完整備份格式錯誤");
-  const ids=new Set(db.events.map(x=>x.entry_id)),incoming=b.journal.events;
-  for(const ev of incoming)if(!ev||typeof ev.entry_id!=="string"||!labels[ev.event_type]||typeof ev.recorded_at!=="string"||!Number.isFinite(Date.parse(ev.recorded_at))||typeof ev.narrative!=="string"||!ev.narrative.trim())throw Error("備份內含格式錯誤的事件");
-  for(const ds of b.datasets)validateDatasetRecord(ds);
-  for(const a of b.attachments)if(!a||typeof a.attachment_id!=="string"||typeof a.blob_data_url!=="string"||!a.blob_data_url.startsWith("data:"))throw Error("備份內含格式錯誤的附件");
+  const ids=new Set(db.events.map(x=>x.entry_id)),incoming=b.journal.events,incomingIds=new Set();
+  for(const ev of incoming){
+   if(!ev||typeof ev.entry_id!=="string"||!labels[ev.event_type]||typeof ev.recorded_at!=="string"||!Number.isFinite(Date.parse(ev.recorded_at))||typeof ev.narrative!=="string"||!ev.narrative.trim())throw Error("備份內含格式錯誤的事件");
+   if(incomingIds.has(ev.entry_id))throw Error("備份內有重複事件 ID");incomingIds.add(ev.entry_id);
+  }
+  const datasetIds=new Set();for(const ds of b.datasets){validateDatasetRecord(ds);if(datasetIds.has(ds.meta.dataset_id))throw Error("備份內有重複資料集 ID");datasetIds.add(ds.meta.dataset_id);}
+  const attachmentIds=new Set(),decoded=[];
+  for(const a of b.attachments){
+   if(!a||typeof a.attachment_id!=="string"||typeof a.blob_data_url!=="string"||!a.blob_data_url.startsWith("data:"))throw Error("備份內含格式錯誤的附件");
+   if(attachmentIds.has(a.attachment_id))throw Error("備份內有重複附件 ID");attachmentIds.add(a.attachment_id);
+   const blob=decodeDataURL(a.blob_data_url);if(a.size!==undefined&&Number(a.size)!==blob.size)throw Error("附件大小與備份資訊不符："+a.name);
+   decoded.push({attachment_id:a.attachment_id,event_id:a.event_id,name:a.name,type:a.type,size:blob.size,blob});
+  }
+  for(const ev of incoming)for(const a of (ev.attachments||[]))if(!attachmentIds.has(a.attachment_id)&&!await get("attachments",a.attachment_id))throw Error("事件引用的附件不存在："+a.name);
   const additions=incoming.filter(x=>!ids.has(x.entry_id));
-  for(const ds of b.datasets)await put("datasets",ds);
-  for(const a of b.attachments){const blob=decodeDataURL(a.blob_data_url);await put("attachments",{attachment_id:a.attachment_id,event_id:a.event_id,name:a.name,type:a.type,size:blob.size,blob});}
-  db.events.push(...additions);persist();await restoreDataset();drawChart();
+  await atomicImport(b.datasets,decoded);
+  const merged=[...db.events,...additions];const serialized=JSON.stringify({version:1,events:merged});
+  localStorage.setItem(KEY,serialized);db.events=merged;render();drawChart();await restoreDataset();
   $("backupStatus").textContent="匯入完成：新增事件 "+additions.length+" 筆、行情 "+b.datasets.length+" 份、附件 "+b.attachments.length+" 個。";
  }catch(err){alert("匯入失敗："+err.message);$("backupStatus").textContent="匯入失敗："+err.message;}
  finally{e.target.value="";}
