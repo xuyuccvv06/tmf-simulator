@@ -2,14 +2,15 @@
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#10151d"><title>TMF 交易行為紀錄</title>
 <style>
 :root{color-scheme:dark;--bg:#0d1219;--panel:#151d28;--panel2:#1b2634;--line:#2a394b;--text:#edf3fa;--muted:#9aaabd;--accent:#79b8ff;--good:#71d6a0;--bad:#ff8d8d}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}header{padding:20px 16px;background:#172333;border-bottom:1px solid var(--line)}.wrap{max-width:1000px;margin:auto;padding:0 14px}h1{font-size:22px;margin:0}h2{font-size:17px;margin:0 0 12px}p{color:var(--muted);margin:5px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px 0 48px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px;min-width:0}.wide{grid-column:1/-1}label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}input,select,textarea{width:100%;border:1px solid var(--line);background:#0e151e;color:var(--text);border-radius:9px;padding:11px;font:inherit}textarea{min-height:90px}button{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:10px 13px;border-radius:9px;font:inherit}button.primary{background:#244d78;border-color:#376da3}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.muted{font-size:13px;color:var(--muted)}.trade{display:block;width:100%;text-align:left;margin-top:8px;background:#111923}.trade.active{border-color:var(--accent)}.empty{padding:20px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}.hidden{display:none!important}.timeline{border-left:2px solid #38536f;margin:12px 0 0 7px;padding-left:15px}.event{position:relative;padding:0 0 14px}.event:before{content:"";position:absolute;left:-22px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--accent)}.event p{white-space:pre-wrap;color:var(--text)}.fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}.section-head{display:flex;justify-content:space-between;align-items:center;gap:8px}canvas{width:100%;height:280px;display:block;background:#0e151e;border-radius:8px}.status{color:var(--good);font-size:13px;margin-top:8px}@media(max-width:700px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.fields{grid-template-columns:1fr}.wrap{padding:0 12px}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}header{padding:20px 16px;background:#172333;border-bottom:1px solid var(--line)}.wrap{max-width:1000px;margin:auto;padding:0 14px}h1{font-size:22px;margin:0}h2{font-size:17px;margin:0 0 12px}p{color:var(--muted);margin:5px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px 0 48px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px;min-width:0}.wide{grid-column:1/-1}label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}input,select,textarea{width:100%;border:1px solid var(--line);background:#0e151e;color:var(--text);border-radius:9px;padding:11px;font:inherit}textarea{min-height:90px}button{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:10px 13px;border-radius:9px;font:inherit}button.primary{background:#244d78;border-color:#376da3}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.muted{font-size:13px;color:var(--muted)}.trade{display:block;width:100%;text-align:left;margin-top:8px;background:#111923}.trade.active{border-color:var(--accent)}.empty{padding:20px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}.hidden{display:none!important}.timeline{border-left:2px solid #38536f;margin:12px 0 0 7px;padding-left:15px}.event{position:relative;padding:0 0 14px}.event:before{content:"";position:absolute;left:-22px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--accent)}.event p{white-space:pre-wrap;color:var(--text)}.fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}.section-head{display:flex;justify-content:space-between;align-items:center;gap:8px}canvas{width:100%;height:280px;display:block;background:#0e151e;border-radius:8px}.status{color:var(--good);font-size:13px;margin-top:8px}.stats-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}.stat{background:#101923;border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0}.stat small{display:block;color:var(--muted);font-size:12px}.stat strong{display:block;font-size:19px;overflow-wrap:anywhere;margin-top:3px}.stat.good strong{color:var(--good)}.stat.bad strong{color:var(--bad)}.period-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}.period-tabs button{padding:8px 4px;font-size:13px}.period-tabs button.active{border-color:var(--accent);background:#244d78}.stats-meta{font-size:12px;color:var(--muted);margin-top:8px}@media(max-width:700px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.fields{grid-template-columns:1fr}.wrap{padding:0 12px}}
 </style></head><body>
 <header><div class="wrap"><h1>TMF 交易行為紀錄</h1><p>忠實保存實際觀察與執行，不預設任何結構或進場規則。</p></div></header>
 <main class="wrap"><div class="grid">
 <section class="panel"><h2>建立交易</h2><label for="title">交易名稱</label><input id="title" placeholder="例如：上午盤交易"><label for="preNote">交易前觀察</label><textarea id="preNote" placeholder="當下看到什麼、怎麼想？"></textarea><div class="actions"><button class="primary" id="createTrade">建立交易</button><button id="addObservation">一般盤面觀察</button></div></section>
 <section class="panel"><h2>資料與備份</h2><div class="actions"><button class="primary" id="exportData">完整備份（含附件與行情）</button><button id="importButton">匯入完整備份</button><input id="importFile" class="hidden" type="file" accept=".json,application/json"></div><label for="datasetFile">載入標準化 TMFR1 CSV</label><input id="datasetFile" type="file" accept=".csv,text/csv"><label for="datasetSelect">已保存資料集</label><select id="datasetSelect"><option value="">尚無資料集</option></select><div class="muted" id="datasetStatus">CSV 驗證後保存至本機 IndexedDB，重開頁面不必重新上傳。</div><div class="muted" id="storageStatus"></div><div class="muted" id="backupStatus">紀錄與行情資料僅保存在本機，請定期備份。</div></section>
+<section class="panel wide"><details id="statsDetails"><summary><strong>交易統計與損益</strong><span class="muted" id="statsHeadline" style="margin-left:8px">尚無已完成交易</span></summary><div class="period-tabs" id="statsPeriods"><button type="button" data-period="week" class="active">本週</button><button type="button" data-period="month">本月</button><button type="button" data-period="half">半年</button><button type="button" data-period="year">今年</button></div><div class="stats-summary"><div class="stat"><small>交易筆數</small><strong id="statCount">0</strong></div><div class="stat"><small>勝率</small><strong id="statWinRate">—</strong></div><div class="stat good"><small>總獲利</small><strong id="statProfit">$0</strong></div><div class="stat bad"><small>總虧損</small><strong id="statLoss">$0</strong></div><div class="stat"><small>淨損益（已扣成本）</small><strong id="statNet">$0</strong></div><div class="stat"><small>平均單筆損益</small><strong id="statAverage">$0</strong></div></div><div class="stats-meta" id="statsBreakdown">獲利 0 筆 · 虧損 0 筆 · 打平 0 筆</div><div class="stats-meta">僅統計未作廢的出場事件；以出場行情時間歸屬，未填行情時間則使用紀錄時間。勝率不計入打平交易。</div></details></section>
 <section class="panel"><div class="section-head"><h2>交易清單</h2><span class="muted" id="tradeCount">0 筆</span></div><div id="tradeList" class="empty">尚無交易紀錄</div></section>
-<section class="panel"><h2>交易事件</h2><div id="noSelection" class="empty">請先選擇一筆交易</div><div id="selectedTrade" class="hidden"><div id="selectedMeta" class="muted"></div><label for="eventType">事件類型</label><select id="eventType"><option value="pre_trade">交易前觀察</option><option value="entry">進場</option><option value="management">持倉管理</option><option value="exit">出場</option><option value="post_trade">事後回顧</option></select><label for="eventNote">當下紀錄</label><textarea id="eventNote" placeholder="記錄當下真實想法、執行與感受。"></textarea><div class="fields"><div><label for="marketTime">行情時間</label><input id="marketTime" type="datetime-local"></div><div><label for="recordTime">紀錄時間</label><input id="recordTime" type="datetime-local"></div></div><details style="margin-top:12px"><summary class="muted">關聯行情區間（選填）</summary><label for="startTime">起點</label><input id="startTime" type="datetime-local"><label for="endTime">終點</label><input id="endTime" type="datetime-local"><div class="muted">選擇的時間必須對應資料集中真實存在的 K 線。</div></details><label for="attachmentFiles">截圖或其他附件</label><input id="attachmentFiles" type="file" accept="image/*,video/*,.pdf,.txt" multiple><div class="muted">附件存於本機 IndexedDB。完整備份會包含附件原始檔與已載入行情資料集，檔案可能較大。</div><div class="actions"><button class="primary" id="appendEvent">保存事件</button></div><div class="status" id="eventStatus"></div><div class="panel" style="margin-top:14px;padding:10px"><div class="section-head"><h2>行情回看</h2><span class="muted" id="chartStatus">選擇已關聯行情的事件</span></div><div class="actions" style="margin:8px 0"><button id="chartZoomOut" type="button">－</button><button id="chartZoomIn" type="button">＋</button><button id="chartReset" type="button">重設視野</button><span class="muted">可用雙指縮放或滑鼠滾輪；拖曳平移</span></div><canvas id="marketChart" height="280" style="touch-action:pan-y"></canvas></div><div class="timeline" id="timeline"></div></div></section>
+<section class="panel"><h2>交易事件</h2><div id="noSelection" class="empty">請先選擇一筆交易</div><div id="selectedTrade" class="hidden"><div id="selectedMeta" class="muted"></div><label for="eventType">事件類型</label><select id="eventType"><option value="pre_trade">交易前觀察</option><option value="entry">進場</option><option value="management">持倉管理</option><option value="exit">出場</option><option value="post_trade">事後回顧</option></select><label for="eventNote">當下紀錄</label><textarea id="eventNote" placeholder="記錄當下真實想法、執行與感受。"></textarea><div id="pnlField" class="hidden"><label for="realizedPnl">實際淨損益（新台幣）</label><input id="realizedPnl" type="number" step="1" inputmode="decimal" placeholder="獲利輸入正數，虧損輸入負數"><div class="muted">請輸入已扣除手續費與交易稅後的金額；獲利填正數，虧損填負數，打平填 0。</div></div><div class="fields"><div><label for="marketTime">行情時間</label><input id="marketTime" type="datetime-local"></div><div><label for="recordTime">紀錄時間</label><input id="recordTime" type="datetime-local"></div></div><details style="margin-top:12px"><summary class="muted">關聯行情區間（選填）</summary><label for="startTime">起點</label><input id="startTime" type="datetime-local"><label for="endTime">終點</label><input id="endTime" type="datetime-local"><div class="muted">選擇的時間必須對應資料集中真實存在的 K 線。</div></details><label for="attachmentFiles">截圖或其他附件</label><input id="attachmentFiles" type="file" accept="image/*,video/*,.pdf,.txt" multiple><div class="muted">附件存於本機 IndexedDB。完整備份會包含附件原始檔與已載入行情資料集，檔案可能較大。</div><div class="actions"><button class="primary" id="appendEvent">保存事件</button></div><div class="status" id="eventStatus"></div><div class="panel" style="margin-top:14px;padding:10px"><div class="section-head"><h2>行情回看</h2><span class="muted" id="chartStatus">選擇已關聯行情的事件</span></div><div class="actions" style="margin:8px 0"><button id="chartZoomOut" type="button">－</button><button id="chartZoomIn" type="button">＋</button><button id="chartReset" type="button">重設視野</button><span class="muted">可用雙指縮放或滑鼠滾輪；拖曳平移</span></div><canvas id="marketChart" height="280" style="touch-action:pan-y"></canvas></div><div class="timeline" id="timeline"></div></div></section>
 <section class="panel wide"><h2>紀錄原則</h2><p>本工具不判斷多空、不自動推導 FVG、HH/HL 或其他數學條件。圖表只呈現原始 OHLC 與你記錄的進出場時間。後續數據化必須回到原始紀錄與行情逐筆核對。</p></section>
 </div></main>
 <script>
@@ -95,7 +96,35 @@ async function readDataset(file){
 function tradeEvents(tid){return db.events.filter(e=>e.trade_id===tid);}
 function permitted(tid,type){const t=tradeEvents(tid).map(e=>e.event_type);if(type==="pre_trade")return !t.includes("entry");if(type==="entry")return !t.includes("entry")&&!t.includes("exit")&&!t.includes("post_trade");if(type==="management")return t.includes("entry")&&!t.includes("exit")&&!t.includes("post_trade");if(type==="exit")return t.includes("entry")&&!t.includes("exit")&&!t.includes("post_trade");if(type==="post_trade")return t.includes("exit")&&!t.includes("post_trade");return false;}
 function eventVoided(eventId,events){return events.some(e=>e.event_type==="void"&&e.target_entry_id===eventId);}
+function periodBounds(period,now=new Date()){
+ const start=new Date(now.getFullYear(),now.getMonth(),now.getDate()),end=new Date(start);
+ if(period==="week"){start.setDate(start.getDate()-(start.getDay()+6)%7);end.setTime(start.getTime());end.setDate(end.getDate()+7);}
+ else if(period==="month"){start.setDate(1);end.setFullYear(start.getFullYear(),start.getMonth()+1,1);}
+ else if(period==="half"){const m=start.getMonth()<6?0:6;start.setMonth(m,1);end.setFullYear(start.getFullYear(),m+6,1);}
+ else{start.setMonth(0,1);end.setFullYear(start.getFullYear()+1,0,1);}
+ return {start:start.getTime(),end:end.getTime()};
+}
+let activeStatsPeriod="week";
+function completedTrades(){
+ const tids=[...new Set(db.events.filter(e=>e.trade_id).map(e=>e.trade_id))],out=[];
+ for(const tid of tids){const es=tradeEvents(tid),exits=es.filter(e=>e.event_type==="exit"&&!eventVoided(e.entry_id,es));if(exits.length!==1)continue;const e=exits[0],p=e.context?.realized_pnl_twd;if(typeof p!=="number"||!Number.isFinite(p))continue;const ms=Date.parse(e.market_timestamp||e.recorded_at);if(Number.isFinite(ms))out.push({p,ms});}
+ return out;
+}
+function renderStats(){
+ const allTrades=completedTrades(),bounds=periodBounds(activeStatsPeriod),rows=allTrades.filter(t=>t.ms>=bounds.start&&t.ms<bounds.end);
+ const wins=rows.filter(t=>t.p>0),losses=rows.filter(t=>t.p<0),flat=rows.filter(t=>t.p===0);
+ const profit=wins.reduce((a,t)=>a+t.p,0),loss=losses.reduce((a,t)=>a+t.p,0),net=profit+loss,rate=wins.length+losses.length?wins.length/(wins.length+losses.length)*100:null;
+ const money=n=>"$"+Math.round(n).toLocaleString("zh-TW");
+ $("statsHeadline").textContent=allTrades.length?"累計 "+allTrades.length+" 筆已完成交易":"尚無已完成交易";
+ $("statCount").textContent=rows.length+" 筆";$("statWinRate").textContent=rate===null?"—":rate.toFixed(1)+"%";
+ $("statProfit").textContent=money(profit);$("statLoss").textContent=money(loss);$("statNet").textContent=(net>0?"+":"")+money(net);
+ $("statNet").parentElement.classList.toggle("good",net>0);$("statNet").parentElement.classList.toggle("bad",net<0);
+ $("statAverage").textContent=rows.length?(net>0?"+":"")+money(net/rows.length):"$0";
+ $("statsBreakdown").textContent="獲利 "+wins.length+" 筆 · 虧損 "+losses.length+" 筆 · 打平 "+flat.length+" 筆";
+ document.querySelectorAll("#statsPeriods button").forEach(b=>b.classList.toggle("active",b.dataset.period===activeStatsPeriod));
+}
 function render(){
+ renderStats();
  const tids=[...new Set(db.events.filter(e=>e.trade_id&&!["amendment","void"].includes(e.event_type)).map(e=>e.trade_id))].reverse();
  $("tradeCount").textContent=tids.length+" 筆";$("tradeList").innerHTML="";
  if(!tids.length)$("tradeList").textContent="尚無交易紀錄";
@@ -105,7 +134,7 @@ function render(){
  es.forEach(e=>{
   const d=document.createElement("div");d.className="event";
   const strong=document.createElement("strong");strong.textContent=labels[e.event_type]||e.event_type;
-  const p=document.createElement("p");p.textContent=e.narrative;
+  const p=document.createElement("p");p.textContent=e.narrative;if(e.event_type==="exit"&&typeof e.context?.realized_pnl_twd==="number"){const pnl=document.createElement("small");pnl.textContent="實際淨損益："+(e.context.realized_pnl_twd>0?"+":"")+"$"+e.context.realized_pnl_twd.toLocaleString("zh-TW");pnl.style.color=e.context.realized_pnl_twd>0?"#71d6a0":e.context.realized_pnl_twd<0?"#ff8d8d":"#9aaabd";d.append(pnl);}
   const time=document.createElement("small");time.textContent=new Date(e.recorded_at).toLocaleString();d.append(strong,time,p);
   if(e.target_entry_id){const target=document.createElement("small");target.textContent="對應紀錄："+e.target_entry_id;d.append(target);}
   if(!["amendment","void"].includes(e.event_type)&&eventVoided(e.entry_id,es)){const mark=document.createElement("small");mark.textContent="此紀錄已標記作廢，原始內容仍保留";mark.style.color="#ff8d8d";d.append(mark);}
@@ -168,6 +197,8 @@ $("datasetFile").onchange=async e=>{const file=e.target.files[0];if(!file)return
 $("appendEvent").onclick=async()=>{
  if(!selected)return;
  const type=$("eventType").value,note=$("eventNote").value.trim();
+ const pnlRaw=$("realizedPnl").value;
+ if(type==="exit"&&(pnlRaw===""||!Number.isFinite(Number(pnlRaw))))return alert("出場事件必須填寫實際淨損益金額");
  if(!note)return alert("請填寫事件內容");
  if(!permitted(selected,type))return alert("事件順序不符合交易紀錄流程");
  const market=$("marketTime").value,record=$("recordTime").value,extra={};
@@ -188,7 +219,8 @@ $("appendEvent").onclick=async()=>{
   extra.context={market_reference:{dataset_id:activeDataset.dataset_id,dataset_sha256:activeDataset.dataset_sha256,timeframe:activeDataset.timeframe,start_timestamp:a,end_timestamp:b}};
  }
  const recordedAt=record?new Date(record):new Date();if(Number.isNaN(recordedAt.getTime()))return alert("紀錄時間格式錯誤");
- const ev={entry_id:uid("jrn"),event_type:type,recorded_at:recordedAt.toISOString(),market_timestamp:extra.market_timestamp||null,trade_id:selected,narrative:note,context:extra.context||{},attachments:[]};
+ const eventContext=extra.context||{};if(type==="exit")eventContext.realized_pnl_twd=Number(pnlRaw);
+ const ev={entry_id:uid("jrn"),event_type:type,recorded_at:recordedAt.toISOString(),market_timestamp:extra.market_timestamp||null,trade_id:selected,narrative:note,context:eventContext,attachments:[]};
  const files=[...$("attachmentFiles").files],total=files.reduce((n,f)=>n+f.size,0);
  if(files.some(f=>f.size>20*1024*1024)||total>50*1024*1024)return alert("單一附件上限 20 MB，每個事件附件合計上限 50 MB");
  const saved=[];
@@ -197,7 +229,7 @@ $("appendEvent").onclick=async()=>{
   if(saved.length)await putMany("attachments",saved);
   db.events.push(ev);
   try{persist();}catch(err){db.events.pop();throw err;}
-  $("eventNote").value="";$("attachmentFiles").value="";$("eventStatus").textContent="事件與 "+saved.length+" 個附件已保存";
+  $("eventNote").value="";$("realizedPnl").value="";$("attachmentFiles").value="";$("eventStatus").textContent="事件與 "+saved.length+" 個附件已保存";
  }catch(err){
   if(saved.length)try{await deleteMany("attachments",saved.map(a=>a.attachment_id));}catch(cleanup){$("eventStatus").textContent="保存失敗且附件清理未完成，請立即匯出備份。";return alert("保存失敗："+err.message+"；附件清理也失敗："+cleanup.message);}
   alert("事件保存失敗："+err.message);
@@ -250,6 +282,8 @@ $("importFile").onchange=async e=>{
  }catch(err){alert("匯入失敗："+err.message);$("backupStatus").textContent="匯入失敗："+err.message;}
  finally{e.target.value="";}
 };
-openDB().then(restoreDataset).catch(e=>$("storageStatus").textContent="IndexedDB 無法使用："+e.message);render();drawChart();
+$("eventType").addEventListener("change",()=>{$("pnlField").classList.toggle("hidden",$("eventType").value!=="exit");});
+ $("statsPeriods").addEventListener("click",e=>{const b=e.target.closest("button[data-period]");if(!b)return;activeStatsPeriod=b.dataset.period;renderStats();});
+ openDB().then(restoreDataset).catch(e=>$("storageStatus").textContent="IndexedDB 無法使用："+e.message);render();drawChart();
 })();
 </script></body></html>
