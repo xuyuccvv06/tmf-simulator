@@ -136,11 +136,29 @@ function readDistance(id){
  if(!Number.isFinite(value)||value<=0)throw new Error('停損／停利距離必須是大於 0 的有限數字，或留空不設定。');
  return value;
 }
+function saveSimulationTrade(closed,fill,time,reason,pts){
+ const key="tmf.behaviourJournal.v1",saved=JSON.parse(localStorage.getItem(key)||'{"version":1,"events":[]}');
+ if(!saved||saved.version!==1||!Array.isArray(saved.events))throw new Error("交易行為紀錄格式無法辨識，為避免覆蓋舊資料已停止保存");
+ const entryIndex=bars.findIndex(b=>b.t===closed.entryTime),exitIndex=bars.findIndex(b=>b.t===time);
+ if(entryIndex<0||exitIndex<0)throw new Error("找不到交易對應的歷史 K 線");
+ const from=Math.max(0,Math.min(entryIndex,exitIndex)-30),to=Math.min(bars.length,Math.max(entryIndex,exitIndex)+31);
+ const snapshotBars=bars.slice(from,to).map(b=>({timestamp:new Date(b.t).toISOString(),open:b.o,high:b.h,low:b.l,close:b.c,volume:Number.isFinite(b.v)?b.v:0}));
+ const iso=t=>new Date(t).toISOString(),tradeId="sim_"+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
+ const title="盤感回放 "+closed.side+"單 · "+iso(closed.entryTime).slice(0,10),common={simulation_source:"tmf_simulator",side:closed.side,entry_price:closed.entry,exit_price:fill,realized_points:pts,exit_reason:reason};
+ const replay_snapshot={timeframe:"5 分鐘",bars:snapshotBars,entry_timestamp:iso(closed.entryTime),exit_timestamp:iso(time)};
+ saved.events.push(
+  {entry_id:"jrn_"+tradeId+"_entry",event_type:"entry",recorded_at:new Date().toISOString(),market_timestamp:iso(closed.entryTime),trade_id:tradeId,narrative:"盤感回放自動紀錄：進場 "+closed.side+"單 @ "+closed.entry,context:{...common,title,replay_snapshot},attachments:[]},
+  {entry_id:"jrn_"+tradeId+"_exit",event_type:"exit",recorded_at:new Date().toISOString(),market_timestamp:iso(time),trade_id:tradeId,narrative:"盤感回放自動紀錄：出場（"+reason+"） @ "+fill+"；損益 "+(pts>=0?"+":"")+pts.toFixed(1)+" 點",context:{...common},attachments:[]}
+ );
+ localStorage.setItem(key,JSON.stringify(saved));
+}
 function finishPosition(fill,time,reason){
  if(!position)return;
  const closed=position,pts=(fill-closed.entry)*(closed.side==='多'?1:-1);
  realizedPoints+=pts;
  lastTrade={side:closed.side,entryTime:closed.entryTime,entry:closed.entry,exitTime:time,exit:fill,points:pts,exitReason:reason};
+ try{saveSimulationTrade(closed,fill,time,reason,pts);}
+ catch(err){$('orderStatus').textContent+='｜交易歷史保存失敗：'+err.message;}
  $('orderStatus').textContent=`${closed.side}單已出場（${reason}）｜進場 ${closed.entryTime} @ ${closed.entry.toLocaleString('en-US')}｜出場 ${time} @ ${fill.toLocaleString('en-US')}｜損益 ${pts>=0?'+':''}${pts.toFixed(1)} 點`;
  position=null;
 }
