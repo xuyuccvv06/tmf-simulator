@@ -25,7 +25,7 @@ jobs:
           assert files, "no HTML files found"
           for path in files:
               html = path.read_text(encoding="utf-8")
-              scripts = re.findall(r"<script(?:\\s[^>]*)?>(.*?)</script>", html, flags=re.S | re.I)
+              scripts = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>", html, flags=re.S | re.I)
               for index, script in enumerate(scripts):
                   target = Path("/tmp") / f"{path.stem}_{index}.js"
                   target.write_text(script, encoding="utf-8")
