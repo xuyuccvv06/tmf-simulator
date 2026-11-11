@@ -40,11 +40,11 @@ test("period boundaries use Monday weeks and calendar periods", () => {
 
 test("completed trades include one valid exit and exclude open, duplicate-exit, and voided trades", () => {
   const entry = event("e1", "exit", { context: { realized_pnl_twd: 1200 }, market_timestamp: "2026-11-10T02:00:00.000Z" });
-  const open = event("e2", "entry");
-  const dup1 = event("e3", "exit", { context: { realized_pnl_twd: 10 } });
-  const dup2 = event("e4", "exit", { context: { realized_pnl_twd: 20 } });
-  const voidExit = event("e5", "exit", { context: { realized_pnl_twd: -300 } });
-  const voidMarker = event("v5", "void", { target_entry_id: "e5" });
+  const open = event("e2", "entry", { trade_id: "T2" });
+  const dup1 = event("e3", "exit", { trade_id: "T3", context: { realized_pnl_twd: 10 } });
+  const dup2 = event("e4", "exit", { trade_id: "T3", context: { realized_pnl_twd: 20 } });
+  const voidExit = event("e5", "exit", { trade_id: "T4", context: { realized_pnl_twd: -300 } });
+  const voidMarker = event("v5", "void", { trade_id: "T4", target_entry_id: "e5" });
   sandbox.db.events = [entry, open, dup1, dup2, voidExit, voidMarker];
   const trades = api.completedTrades();
   assert.equal(trades.length, 1);
