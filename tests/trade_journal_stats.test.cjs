@@ -10,7 +10,7 @@ assert.ok(start >= 0 && end > start, "journal statistics helpers must exist");
 const helpers = html.slice(start, end);
 const sandbox = {
   db: { events: [] },
-  tradeEvents(tid) { return sandbox.db.events.filter(event => event.trade_id === tid); },
+  tradeEvents(tid) { return globalThis.db.events.filter(event => event.trade_id === tid); },
   Date, Set, Number
 };
 vm.createContext(sandbox);
