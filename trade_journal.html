@@ -26,7 +26,7 @@ function atomicImport(datasets,chunks,attachments){
  return new Promise((resolve,reject)=>{
   let tx;try{tx=idb.transaction(["datasets","dataset_chunks","attachments"],"readwrite");}catch(err){reject(err);return;}
   tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error("備份匯入交易失敗"));tx.onabort=()=>reject(tx.error||new Error("備份匯入已中止"));
-  const ds=tx.objectStore("datasets"),cs=tx.objectStore("dataset_chunks"),at=tx.objectStore("attachments);
+  const ds=tx.objectStore("datasets"),cs=tx.objectStore("dataset_chunks"),at=tx.objectStore("attachments");
   datasets.forEach(x=>ds.put(x));chunks.forEach(x=>cs.put(x));attachments.forEach(x=>at.put(x));
  });
 }
@@ -168,8 +168,8 @@ async function blobDataURL(blob){return await new Promise((resolve,reject)=>{con
 function decodeDataURL(url){const parts=url.split(","),mime=(parts[0].match(/data:([^;]+)/)||[])[1]||"application/octet-stream",raw=atob(parts[1]),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);return new Blob([bytes],{type:mime});}
 $("exportData").onclick=async()=>{
  try{$("backupStatus").textContent="正在整理完整備份…";const datasets=await all("datasets"),stored=await all("attachments"),attachments=[];
- for(const a of stored)attachments.push({attachment_id:a.attachment_id,event_id:a.event_id,name:a.name,type:a.type,size:a.size,blob_data_url:await blobDataURL(a.blob)});
- const bundle={backup_format:"tmf-journal-full-v1",created_at:new Date().toISOString(),journal:db,datasets,attachments,manifest:{event_count:db.events.length,dataset_count:datasets.length,attachment_count:attachments.length,total_dataset_bars:datasets.reduce((n,d)=>n+(d.bars?.length||0),0)}};
+ for(const a of stored)attachments.push({attachment_id:a.attachment_id,event_id:a.event_id,name:a.name,type:a.type,size:a.size,blob_data_url:await blobDataURL(a.blob)});const packedDatasets=[];for(const d of datasets){const bars=await getAllDatasetBars(d.meta);packedDatasets.push({meta:d.meta,bars});}
+ const bundle={backup_format:"tmf-journal-full-v1",created_at:new Date().toISOString(),journal:db,datasets:packedDatasets,attachments,manifest:{event_count:db.events.length,dataset_count:packedDatasets.length,attachment_count:attachments.length,total_dataset_bars:packedDatasets.reduce((n,d)=>n+(d.bars?.length||0),0)}};
  const blob=new Blob([JSON.stringify(bundle)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="tmf-full-backup-"+new Date().toISOString().slice(0,10)+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
  $("backupStatus").textContent="完整備份已匯出：事件 "+db.events.length+" 筆、行情 "+datasets.length+" 份、附件 "+attachments.length+" 個。";
  }catch(err){$("backupStatus").textContent="備份失敗："+err.message;alert("備份失敗："+err.message);}
@@ -202,7 +202,9 @@ $("importFile").onchange=async e=>{
   }
   for(const ev of incoming)for(const a of (ev.attachments||[]))if(!attachmentIds.has(a.attachment_id)&&!await get("attachments",a.attachment_id))throw Error("事件引用的附件不存在："+a.name);
   const additions=incoming.filter(x=>!ids.has(x.entry_id));
-  await atomicImport(b.datasets,decoded);
+  const packedForImport=[],chunksForImport=[];
+  for(const source of b.datasets){const packed=chunkDataset(source);packedForImport.push(packed.dataset);chunksForImport.push(...packed.chunks);}
+  await atomicImport(packedForImport,chunksForImport,decoded);
   const merged=[...db.events,...additions];const serialized=JSON.stringify({version:1,events:merged});
   localStorage.setItem(KEY,serialized);db.events=merged;render();drawChart();await restoreDataset();
   $("backupStatus").textContent="匯入完成：新增事件 "+additions.length+" 筆、行情 "+b.datasets.length+" 份、附件 "+b.attachments.length+" 個。";
