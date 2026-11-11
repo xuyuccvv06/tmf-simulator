@@ -269,10 +269,11 @@ $("importFile").onchange=async e=>{
  try{
   const b=JSON.parse(await file.text());
   if(b.backup_format!=="tmf-journal-full-v1"||!b.journal||b.journal.version!==1||!Array.isArray(b.journal.events)||!Array.isArray(b.datasets)||!Array.isArray(b.attachments))throw Error("完整備份格式錯誤");
-  const ids=new Set(db.events.map(x=>x.entry_id)),incoming=b.journal.events,incomingIds=new Set();
+  const existingById=new Map(db.events.map(x=>[x.entry_id,x])),ids=new Set(existingById.keys()),incoming=b.journal.events,incomingIds=new Set();
   for(const ev of incoming){
    if(!ev||typeof ev.entry_id!=="string"||!labels[ev.event_type]||typeof ev.recorded_at!=="string"||!Number.isFinite(Date.parse(ev.recorded_at))||typeof ev.narrative!=="string"||!ev.narrative.trim())throw Error("備份內含格式錯誤的事件");
    if(incomingIds.has(ev.entry_id))throw Error("備份內有重複事件 ID");incomingIds.add(ev.entry_id);
+   const existing=existingById.get(ev.entry_id);if(existing&&JSON.stringify(existing)!==JSON.stringify(ev))throw Error("事件 ID 衝突，現有紀錄與備份內容不同："+ev.entry_id);
    if(ev.event_type==="exit"&&ev.context?.realized_pnl_twd!==undefined&&(typeof ev.context.realized_pnl_twd!=="number"||!Number.isFinite(ev.context.realized_pnl_twd)))throw Error("出場淨損益必須是有效數字");
    if(ev.event_type==="amendment"&&ev.context?.amendment_kind==="pnl_correction"&&(typeof ev.context.corrected_realized_pnl_twd!=="number"||!Number.isFinite(ev.context.corrected_realized_pnl_twd)||typeof ev.target_entry_id!=="string"||!ev.target_entry_id))throw Error("損益修正紀錄格式錯誤");
   }
@@ -292,9 +293,12 @@ $("importFile").onchange=async e=>{
   for(const ev of additions)if(ev.event_type==="amendment"&&ev.context?.amendment_kind==="pnl_correction"&&!ids.has(ev.target_entry_id)&&!incomingById.has(ev.target_entry_id))throw Error("損益修正缺少原始出場紀錄，已中止匯入");
   const packedForImport=[],chunksForImport=[];
   for(const source of b.datasets){const packed=chunkDataset(source);packedForImport.push(packed.dataset);chunksForImport.push(...packed.chunks);}
-  await atomicImport(packedForImport,chunksForImport,decoded);
-  const merged=[...db.events,...additions];const serialized=JSON.stringify({version:1,events:merged});
-  localStorage.setItem(KEY,serialized);db.events=merged;render();drawChart();await restoreDataset();
+  const merged=[...db.events,...additions],serialized=JSON.stringify({version:1,events:merged}),previousJournal=localStorage.getItem(KEY);
+  // Commit the journal first, then IndexedDB. If IndexedDB fails, restore the prior journal.
+  localStorage.setItem(KEY,serialized);
+  try{await atomicImport(packedForImport,chunksForImport,decoded);}
+  catch(storageError){try{if(previousJournal===null)localStorage.removeItem(KEY);else localStorage.setItem(KEY,previousJournal);}catch(rollbackError){throw Error("匯入失敗，且本機紀錄回復失敗；請勿關閉頁面，立即匯出目前資料。原始錯誤："+storageError.message+"；回復錯誤："+rollbackError.message);}throw storageError;}
+  db.events=merged;render();drawChart();await restoreDataset();
   $("backupStatus").textContent="匯入完成：新增事件 "+additions.length+" 筆、行情 "+b.datasets.length+" 份、附件 "+b.attachments.length+" 個。";
  }catch(err){alert("匯入失敗："+err.message);$("backupStatus").textContent="匯入失敗："+err.message;}
  finally{e.target.value="";}
