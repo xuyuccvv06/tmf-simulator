@@ -29,8 +29,7 @@ label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}input,se
 <section class="panel">
 <h2>資料備份</h2>
 <p>紀錄目前只保存在這台裝置、這個瀏覽器。清除瀏覽器資料可能導致紀錄遺失。</p>
-<div class="actions"><button class="primary" id="exportData">匯出備份 JSON</button><button id="importButton">匯入備份 JSON</button><input class="hidden" type="file" id="importFile" accept="application/json,.json"></div>
-<div class="muted" id="backupStatus">建議每次交易日結束後匯出備份。</div>
+<div class="actions"><button class="primary" id="exportData">匯出備份 JSON</button><button id="importButton">匯入備份 JSON</button><input class="hidden" type="file" id="importFile" accept="application/json,.json"></div>\n<label for="datasetFile">載入標準化 TMFR1 CSV</label><input id="datasetFile" type="file" accept=".csv,text/csv"><div class="muted" id="datasetStatus">僅接受標準欄位 CSV；上傳後計算 SHA-256 並驗證時間戳。</div>\n<div class="muted" id="backupStatus">建議每次交易日結束後匯出備份。</div>
 </section>
 <section class="panel">
 <div class="section-head"><h2>交易清單</h2><span class="tag" id="tradeCount">0 筆</span></div>
@@ -55,7 +54,7 @@ label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}input,se
 <label for="datasetHash">資料集 SHA-256</label><input id="datasetHash" placeholder="64 位十六進位雜湊">
 <div class="fields"><div><label for="timeframe">週期</label><input id="timeframe" placeholder="5m"></div><div><label for="startTime">行情區間起點</label><input id="startTime" type="datetime-local"></div></div>
 <label for="endTime">行情區間終點</label><input id="endTime" type="datetime-local">
-<p class="muted">目前介面只保存你提供的關聯資訊；尚未連接行情檔案，也不會自動確認 K 線是否存在。</p>
+<p class="muted">載入 CSV 後會檢查起訖時間是否精確存在於資料中。此頁不會上傳 CSV 到伺服器。</p>
 </details>
 <div class="actions"><button class="primary" id="appendEvent">保存事件</button></div>
 <div id="eventStatus" class="status" role="status"></div>
@@ -73,11 +72,53 @@ label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}input,se
 const KEY="tmf.behaviourJournal.v1";
 const $=id=>document.getElementById(id);
 const labels={pre_trade:"交易前觀察",entry:"進場",management:"持倉管理",exit:"出場",post_trade:"事後回顧",observation:"一般盤面觀察"};
-let db={version:1,events:[]},selected=null;
+let db={version:1,events:[]},selected=null,activeDataset=null;
 try{const saved=localStorage.getItem(KEY);if(saved){const parsed=JSON.parse(saved);if(parsed&&parsed.version===1&&Array.isArray(parsed.events))db=parsed;}}catch(e){$("backupStatus").textContent="讀取本機紀錄失敗，請勿覆蓋；可嘗試匯入先前備份。";}
 function save(){localStorage.setItem(KEY,JSON.stringify(db));render();}
 function id(prefix){return prefix+"_"+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));}
 function nowLocal(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16);}
+function parseCSV(text){
+ const rows=[];let row=[],field="",quoted=false;
+ for(let i=0;i<text.length;i++){const ch=text[i];
+  if(quoted){if(ch==='"'&&text[i+1]==='"'){field+='"';i++;}else if(ch==='"')quoted=false;else field+=ch;}
+  else if(ch==='"'){if(field.length)throw new Error("CSV 引號位置錯誤");quoted=true;}
+  else if(ch===","){row.push(field);field="";}
+  else if(ch==="\\n"){row.push(field.replace(/\\r$/,""));rows.push(row);row=[];field="";}
+  else field+=ch;
+ }
+ if(quoted)throw new Error("CSV 引號未關閉");
+ if(field.length||row.length){row.push(field.replace(/\\r$/,""));rows.push(row);}
+ return rows;
+}
+function normalizeTimestamp(value){
+ const s=String(value||"").trim().replace("T"," ");
+ if(!/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?$/.test(s))throw new Error("時間戳格式必須為 YYYY-MM-DD HH:mm:ss");
+ const d=new Date(s.replace(" ","T")+"+08:00");if(Number.isNaN(d.getTime()))throw new Error("CSV 含有無效時間戳");
+ return d.toISOString();
+}
+async function loadCanonicalDataset(file){
+ const textData=await file.text(),rows=parseCSV(textData);
+ if(rows.length<2)throw new Error("CSV 沒有資料列");
+ const expected=["timestamp","trading_date","product_id","timeframe","open","high","low","close","volume"];
+ if(JSON.stringify(rows[0].map(x=>x.trim()))!==JSON.stringify(expected))throw new Error("欄位或欄位順序不符合標準資料集 V1");
+ const timestamps=new Set(),products=new Set(),frames=new Set();let first=null,last=null,count=0,previous=-Infinity;
+ for(let i=1;i<rows.length;i++){
+  const r=rows[i];if(r.length!==expected.length)throw new Error("第 "+(i+1)+" 列欄位數錯誤");
+  if(r.every(x=>!String(x).trim()))throw new Error("第 "+(i+1)+" 列為空白列");
+  const ts=normalizeTimestamp(r[0]),ms=Date.parse(ts);
+  if(ms<=previous)throw new Error("時間戳必須嚴格遞增，錯誤列："+(i+1));previous=ms;
+  if(timestamps.has(ts))throw new Error("發現重複時間戳："+r[0]);timestamps.add(ts);
+  products.add(r[2].trim());frames.add(r[3].trim());
+  for(const j of [4,5,6,7,8])if(!Number.isFinite(Number(r[j]))||r[j].trim()==="")throw new Error("第 "+(i+1)+" 列含非數字 OHLCV");
+  const [o,h,l,cl,v]=[4,5,6,7,8].map(j=>Number(r[j]));
+  if(Math.min(o,h,l,cl)<=0||l>Math.min(o,cl)||h<Math.max(o,cl)||v<0)throw new Error("第 "+(i+1)+" 列 OHLCV 邏輯錯誤");
+  first=first||ts;last=ts;count++;
+ }
+ if(products.size!==1||frames.size!==1)throw new Error("資料集混有不同商品或週期");
+ const digest=await crypto.subtle.digest("SHA-256",await file.arrayBuffer());
+ const hash=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("");
+ return {dataset_id:"ds_"+hash.slice(0,16),dataset_sha256:hash,timeframe:[...frames][0],product_id:[...products][0],row_count:count,first_timestamp:first,last_timestamp:last,timestamps};
+}
 function event(type,narrative,tradeId=null,extra={}){const entered=extra.recorded_at?new Date(extra.recorded_at):new Date();return {journal_version:"1.0.0",entry_id:id("jrn"),event_type:type,recorded_at:entered.toISOString(),market_timestamp:extra.market_timestamp||null,trade_id:tradeId,narrative,context:extra.context||{},attachments:[]};}
 function eventsFor(tid){return db.events.filter(e=>e.trade_id===tid);}
 function allowed(tid,type){
@@ -126,6 +167,18 @@ $("createTrade").onclick=()=>{
 $("addObservation").onclick=()=>{
  const note=$("preNote").value.trim();if(!note){alert("請先填寫一般盤面觀察。");return;}
  db.events.push(event("observation",note));$("preNote").value="";save();$("backupStatus").textContent="一般盤面觀察已保存。";
+};
+$("datasetFile").onchange=async ev=>{
+ const file=ev.target.files[0];if(!file)return;
+ $("datasetStatus").textContent="正在讀取與驗證 CSV…";
+ try{
+  const loaded=await loadCanonicalDataset(file);
+  activeDataset=loaded;
+  $("datasetId").value=loaded.dataset_id;$("datasetHash").value=loaded.dataset_sha256;
+  $("timeframe").value=loaded.timeframe;
+  $("datasetStatus").textContent="已載入 "+loaded.product_id+" · "+loaded.timeframe+" · "+loaded.row_count.toLocaleString()+" 列 · SHA-256 "+loaded.dataset_sha256.slice(0,16)+"…";
+ }catch(err){activeDataset=null;$("datasetStatus").textContent="載入失敗："+err.message;alert("CSV 載入失敗："+err.message);}
+ finally{ev.target.value="";}
 };
 $("appendEvent").onclick=()=>{
  if(!selected)return;
