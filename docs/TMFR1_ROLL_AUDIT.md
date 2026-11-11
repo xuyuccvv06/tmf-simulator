@@ -8,7 +8,7 @@
 
 ## 本輪已完成
 
-- 確認現有正式 1 分鐘資料包含 397,905 根完整 session K 棒。
+- 確認目前納入版本控制的資料為 TMFR1 5 分 K，共 79,689 列；本次 CI 依該 5 分 K 檔案建立 session 摘要。
 - 確認欄位包含 `product_id=TMFR1`，沒有 `contract_month`、`contract_code`。
 - 加入合約身分稽核器：缺少個別合約欄位時回報 `continuous_or_unidentified`，不猜測月份。
 - 建立第三個星期三事件窗口報告器，輸出到期日前後各兩個曆日的 session OHLC、成交量與相鄰 session 開盤差。
