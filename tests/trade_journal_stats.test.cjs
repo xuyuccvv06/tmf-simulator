@@ -13,7 +13,7 @@ const sandbox = {
   Date, Set, Number
 };
 vm.createContext(sandbox);
-vm.runInContext(helpers + String.fromCharCode(10) + "globalThis.api = { eventVoided, periodBounds, effectiveExitPnl, completedTrades };", sandbox);
+vm.runInContext(helpers + String.fromCharCode(10) + "function tradeEvents(tid) { return db.events.filter(event => event.trade_id === tid); }" + String.fromCharCode(10) + "globalThis.api = { eventVoided, periodBounds, effectiveExitPnl, completedTrades };", sandbox);
 const api = sandbox.api;
 const event = (entry_id, event_type, extra = {}) => ({
   entry_id, event_type, trade_id: "T1",
