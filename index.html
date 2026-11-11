@@ -78,7 +78,14 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
   <div><label for="stopLossPoints">停損距離（點，可留空）</label><input id="stopLossPoints" type="number" min="0" step="0.1" inputmode="decimal" placeholder="不設定"></div>
   <div><label for="takeProfitPoints">停利距離（點，可留空）</label><input id="takeProfitPoints" type="number" min="0" step="0.1" inputmode="decimal" placeholder="不設定"></div>
  </div>
- <p class="note">停損／停利以進場成交價為基準。若同一根 K 線同時觸及兩者，採保守規則先判定停損；若開盤跳空越過觸發價，按開盤價模擬成交。</p>
+ <p class="note">開倉前可設定停損／停利距離；成交後也可在下方直接輸入價格管理。停損只能往獲利方向移動，不可放寬；停利可調整。若同一根 K 線同時觸及兩者，採停損優先；開盤跳空越過觸發價，按開盤價模擬成交。</p>
+ <div id="positionManager" class="trade-record" style="margin-top:10px;display:none">
+  <div class="stat full"><small>持倉管理</small><b>成交後設定／修改價格（直接輸入價格）</b></div>
+  <div><label for="managedStopPrice">停損價格</label><input id="managedStopPrice" type="number" step="1" inputmode="decimal" placeholder="輸入停損價"></div>
+  <div><label for="managedTargetPrice">停利價格</label><input id="managedTargetPrice" type="number" step="1" inputmode="decimal" placeholder="輸入停利價"></div>
+  <div class="row full"><button id="applyStop" class="primary">確認停損</button><button id="applyTarget">確認停利</button></div>
+  <p class="note full" id="managementStatus">多單停損只能上移；空單停損只能下移。停損不提供放寬或清除。</p>
+ </div>
  <div class="row" style="margin-top:10px">
   <button id="buy" class="primary">市價做多</button>
   <button id="sell" style="background:#71363a;border-color:#9a4b50">市價做空</button>
@@ -144,13 +151,39 @@ function saveSimulationTrade(closed,fill,time,reason,pts){
  const from=Math.max(0,Math.min(entryIndex,exitIndex)-30),to=Math.min(bars.length,Math.max(entryIndex,exitIndex)+31);
  const snapshotBars=bars.slice(from,to).map(b=>({timestamp:new Date(b.t).toISOString(),open:b.o,high:b.h,low:b.l,close:b.c,volume:Number.isFinite(b.v)?b.v:0}));
  const iso=t=>new Date(t).toISOString(),tradeId="sim_"+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
- const title="盤感回放 "+closed.side+"單 · "+iso(closed.entryTime).slice(0,10),common={simulation_source:"tmf_simulator",side:closed.side,entry_price:closed.entry,exit_price:fill,realized_points:pts,exit_reason:reason};
+ const title="盤感回放 "+closed.side+"單 · "+iso(closed.entryTime).slice(0,10),common={simulation_source:"tmf_simulator",side:closed.side,entry_price:closed.entry,exit_price:fill,realized_points:pts,exit_reason:reason,stop_history:closed.stopHistory||[],target_history:closed.targetHistory||[]};
  const replay_snapshot={timeframe:"5 分鐘",bars:snapshotBars,entry_timestamp:iso(closed.entryTime),exit_timestamp:iso(time)};
  saved.events.push(
   {entry_id:"jrn_"+tradeId+"_entry",event_type:"entry",recorded_at:new Date().toISOString(),market_timestamp:iso(closed.entryTime),trade_id:tradeId,narrative:"盤感回放自動紀錄：進場 "+closed.side+"單 @ "+closed.entry,context:{...common,title,replay_snapshot},attachments:[]},
   {entry_id:"jrn_"+tradeId+"_exit",event_type:"exit",recorded_at:new Date().toISOString(),market_timestamp:iso(time),trade_id:tradeId,narrative:"盤感回放自動紀錄：出場（"+reason+"） @ "+fill+"；損益 "+(pts>=0?"+":"")+pts.toFixed(1)+" 點",context:{...common},attachments:[]}
  );
  localStorage.setItem(key,JSON.stringify(saved));
+}
+function recordRiskChange(kind,oldPrice,newPrice,status,reason){
+ if(!position)return;
+ const last=revealed?bars[revealed-1]:null;
+ const item={kind,old_price:oldPrice,new_price:newPrice,market_timestamp:last?last.t:null,recorded_at:new Date().toISOString(),status,reason:reason||""};
+ (kind==="stop"?position.stopHistory:position.targetHistory).push(item);
+}
+function applyManagedStop(){
+ if(!position){$('managementStatus').textContent='目前沒有持倉。';return}
+ const raw=$('managedStopPrice').value.trim(),next=Number(raw),p=position,long=p.side==='多',old=p.stopLoss;
+ if(!raw||!Number.isFinite(next)){$('managementStatus').textContent='請輸入有效的停損價格。';return}
+ const validSide=long?next<p.entry:next>p.entry;
+ if(old===null&&!validSide){recordRiskChange('stop',null,next,'rejected','首次停損必須位於開倉價的虧損側');$('managementStatus').textContent='首次設定停損必須位於開倉價的虧損側。';return}
+ const tighter=old===null||(long?next>old:next<old);
+ if(!tighter){recordRiskChange('stop',old,next,'rejected','停損不得往不利方向放寬或維持原價');$('managementStatus').textContent='拒絕修改：停損只能往獲利方向移動，不能放寬或設回更差的位置。';return}
+ recordRiskChange('stop',old,next,'accepted','停損設定／單向收緊');position.stopLoss=next;
+ $('managementStatus').textContent='停損已更新：'+(old===null?'首次設定':old.toLocaleString('en-US')+' →')+' '+next.toLocaleString('en-US')+'。' ;
+ $('managedStopPrice').value='';updateTradeUI();
+}
+function applyManagedTarget(){
+ if(!position){$('managementStatus').textContent='目前沒有持倉。';return}
+ const raw=$('managedTargetPrice').value.trim(),next=Number(raw),p=position,long=p.side==='多',old=p.takeProfit;
+ if(!raw||!Number.isFinite(next)||(long?next<=p.entry:next>=p.entry)){$('managementStatus').textContent='停利價格必須位於開倉價的獲利側。';return}
+ recordRiskChange('target',old,next,'accepted','停利設定／修改');position.takeProfit=next;
+ $('managementStatus').textContent='停利已更新：'+(old===null?'首次設定':old.toLocaleString('en-US')+' →')+' '+next.toLocaleString('en-US')+'。' ;
+ $('managedTargetPrice').value='';updateTradeUI();
 }
 function finishPosition(fill,time,reason){
  if(!position)return;
@@ -193,7 +226,9 @@ function executePending(bar){
   const side=order.type==='buy'?'多':'空';
   position={side,entry:fill,entryTime:bar.t,
    stopLoss:order.stopDistance===null?null:fill+(side==='多'?-order.stopDistance:order.stopDistance),
-   takeProfit:order.targetDistance===null?null:fill+(side==='多'?order.targetDistance:-order.targetDistance)};
+   takeProfit:order.targetDistance===null?null:fill+(side==='多'?order.targetDistance:-order.targetDistance),stopHistory:[],targetHistory:[]};
+  if(position.stopLoss!==null)position.stopHistory.push({kind:'stop',old_price:null,new_price:position.stopLoss,market_timestamp:bar.t,recorded_at:new Date().toISOString(),status:'accepted',reason:'開倉委託初始停損'});
+  if(position.takeProfit!==null)position.targetHistory.push({kind:'target',old_price:null,new_price:position.takeProfit,market_timestamp:bar.t,recorded_at:new Date().toISOString(),status:'accepted',reason:'開倉委託初始停利'});
   const risk=position.stopLoss===null?'未設定停損':'停損 '+position.stopLoss.toLocaleString('en-US');
   const reward=position.takeProfit===null?'未設定停利':'停利 '+position.takeProfit.toLocaleString('en-US');
   $('orderStatus').textContent=`${side}單已成交：${fill.toLocaleString('en-US')} 點（${bar.t}）｜${risk}｜${reward}`;
@@ -205,6 +240,8 @@ function executePending(bar){
 function updateTradeUI(){
  const last=revealed?bars[revealed-1]:null;
  $('positionSide').textContent=position?position.side+' 1口':'空手';
+ $('positionManager').style.display=position?'grid':'none';
+ if(position){if(document.activeElement!==$('managedStopPrice'))$('managedStopPrice').placeholder=position.stopLoss===null?'尚未設定停損':'目前 '+position.stopLoss.toLocaleString('en-US');if(document.activeElement!==$('managedTargetPrice'))$('managedTargetPrice').placeholder=position.takeProfit===null?'尚未設定停利':'目前 '+position.takeProfit.toLocaleString('en-US');}
  $('entryPrice').textContent=position?position.entry.toLocaleString('en-US'):'—';
  $('stopPrice').textContent=position&&position.stopLoss!==null?position.stopLoss.toLocaleString('en-US'):'—';
  $('targetPrice').textContent=position&&position.takeProfit!==null?position.takeProfit.toLocaleString('en-US'):'—';
@@ -232,7 +269,7 @@ chart.addEventListener('click',e=>{const rect=chart.getBoundingClientRect(),x=(e
 $('barCursor').oninput=()=>{selectedIndex=+$('barCursor').value;updateSelectedBar();draw(bars.slice(0,revealed));};
 $('cursorLatest').onclick=()=>{selectedIndex=Math.max(0,revealed-1);$('barCursor').value=selectedIndex;const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);updateSelectedBar();draw(bars.slice(0,revealed));};
 $('buy').onclick=()=>placeMarketOrder('buy');$('sell').onclick=()=>placeMarketOrder('sell');$('close').onclick=()=>placeMarketOrder('close');
-$('step').onclick=step;$('play').onclick=play;$('reset').onclick=()=>loadDate($('session').value);$('speed').onchange=()=>{if(timer){stop();play()}};$('visible').onchange=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);if(selectedIndex<viewStart)selectedIndex=viewStart;render()};$('latest').onclick=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);render()};$('session').onchange=()=>loadDate($('session').value);$('newSession').onclick=()=>{const d=dates[Math.floor(Math.random()*dates.length)];$('session').value=d;loadDate(d)};
+$('step').onclick=step;$('play').onclick=play;$('applyStop').onclick=applyManagedStop;$('applyTarget').onclick=applyManagedTarget;$('reset').onclick=()=>loadDate($('session').value);$('speed').onchange=()=>{if(timer){stop();play()}};$('visible').onchange=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);if(selectedIndex<viewStart)selectedIndex=viewStart;render()};$('latest').onclick=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);render()};$('session').onchange=()=>loadDate($('session').value);$('newSession').onclick=()=>{const d=dates[Math.floor(Math.random()*dates.length)];$('session').value=d;loadDate(d)};
 async function init(){try{setStatus('正在載入 CSV…');const res=await fetch('./TMFR1_5min_2024-2025.csv');if(!res.ok)throw new Error(`CSV 載入失敗：HTTP ${res.status}`);all=parseCSV(await res.text());if(!all.length)throw new Error('CSV 沒有可用行情');all.sort((a,b)=>a.t.localeCompare(b.t));dates=[...new Set(all.map(x=>x.d))].sort();dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;$('session').appendChild(o)});$('session').value=dates[0];loadDate(dates[0]);setStatus(`資料載入完成・${all.length.toLocaleString()} 根`)}catch(e){setStatus('載入失敗');const msg=document.createElement('p');msg.className='note';msg.style.color='#f06468';msg.textContent=e.message+'。請確認 CSV 與 HTML 位於同一個 GitHub Repository 根目錄，並透過 GitHub Pages 網址開啟。';document.querySelector('main').prepend(msg)}}
 init();
 </script>
