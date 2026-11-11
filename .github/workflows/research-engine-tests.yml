@@ -16,6 +16,17 @@ jobs:
           python-version: "3.11"
       - run: python -m pip install -e ".[test]"
       - run: python -m pytest -q
+      - name: Validate trade journal inline JavaScript syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path("trade_journal.html").read_text(encoding="utf-8")
+          scripts = re.findall(r"<script>(.*?)</script>", html, flags=re.S)
+          assert len(scripts) == 1, "expected exactly one inline script"
+          Path("/tmp/trade_journal.js").write_text(scripts[0], encoding="utf-8")
+          PY
+          node --check /tmp/trade_journal.js
       - name: Profile checked-in TMFR1 CSV (read-only)
         if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
         run: python scripts/profile_csv.py TMFR1_5min_2024-2025.csv > tmfr1_csv_profile.json
