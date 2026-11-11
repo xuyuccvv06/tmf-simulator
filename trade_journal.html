@@ -155,6 +155,19 @@ function render(){
   if(e.target_entry_id){const target=document.createElement("small");target.textContent="對應紀錄："+e.target_entry_id;d.append(target);}
   if(!["amendment","void"].includes(e.event_type)&&eventVoided(e.entry_id,es)){const mark=document.createElement("small");mark.textContent="此紀錄已標記作廢，原始內容仍保留";mark.style.color="#ff8d8d";d.append(mark);}
   if(e.market_timestamp){const m=document.createElement("small");m.textContent="行情時間："+e.market_timestamp;d.append(m);}
+  if(e.event_type==="exit"&&(e.context?.stop_history?.length||e.context?.target_history?.length)){
+   const audit=document.createElement("div");audit.style.cssText="margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:9px;background:#101923";
+   const heading=document.createElement("strong");heading.textContent="停損／停利修改歷程";audit.append(heading);
+   const rows=[...(e.context.stop_history||[]),...(e.context.target_history||[])].sort((a,b)=>String(a.recorded_at||"").localeCompare(String(b.recorded_at||"")));
+   rows.forEach(item=>{
+    const line=document.createElement("div");line.style.cssText="margin-top:7px;font-size:13px;color:var(--muted)";
+    const kind=item.kind==="stop"?"停損":"停利",status=item.status==="accepted"?"已接受":"已拒絕",old=item.old_price==null?"未設定":Number(item.old_price).toLocaleString("en-US"),next=Number(item.new_price).toLocaleString("en-US");
+    line.textContent=kind+"｜"+status+"｜"+old+" → "+next+(item.market_timestamp?"｜行情 "+item.market_timestamp:"")+(item.reason?"｜"+item.reason:"");
+    if(item.status!=="accepted")line.style.color="var(--bad)";else line.style.color="var(--good)";
+    audit.append(line);
+   });
+   d.append(audit);
+  }
   if(e.attachments?.length)e.attachments.forEach(a=>{const b=document.createElement("button");b.textContent="下載 "+a.name;b.onclick=async()=>{const item=await get("attachments",a.attachment_id);if(!item)return alert("附件不存在");const u=URL.createObjectURL(item.blob),link=document.createElement("a");link.href=u;link.download=item.name;link.click();setTimeout(()=>URL.revokeObjectURL(u),30000);};d.append(b);});
   if(!["amendment","void"].includes(e.event_type)&&!eventVoided(e.entry_id,es)){
    const actions=document.createElement("div");actions.className="actions";
