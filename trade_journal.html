@@ -84,6 +84,7 @@ function render(){
   $("timeline").append(d);
  });
 }
+function lowerBoundBars(bars,ms){let lo=0,hi=bars.length;while(lo<hi){const mid=(lo+hi)>>1;if(Date.parse(bars[mid].timestamp)<ms)lo=mid+1;else hi=mid;}return lo;}
 async function drawChart(){
  const canvas=$("marketChart");if(!canvas)return;
  const ctx=canvas.getContext("2d"),w=canvas.clientWidth||500,h=280,dpr=window.devicePixelRatio||1;
@@ -100,7 +101,7 @@ async function drawChart(){
  let from=ref.start_timestamp?Date.parse(ref.start_timestamp):NaN,to=ref.end_timestamp?Date.parse(ref.end_timestamp):NaN;
  if(idx.length){const a=Math.max(0,Math.min(...idx)-30),b=Math.min(loadedBars.length-1,Math.max(...idx)+30);if(!Number.isFinite(from)||!Number.isFinite(to)){from=Date.parse(loadedBars[a].timestamp);to=Date.parse(loadedBars[b].timestamp);}}
  if(!Number.isFinite(from)||!Number.isFinite(to)){from=Date.parse(loadedBars[0].timestamp);to=Date.parse(loadedBars[loadedBars.length-1].timestamp);}
- chartBaseBars=loadedBars.filter(b=>Date.parse(b.timestamp)>=from&&Date.parse(b.timestamp)<=to);
+ const rangeStart=lowerBoundBars(loadedBars,from),rangeEnd=lowerBoundBars(loadedBars,to+1);chartBaseBars=loadedBars.slice(rangeStart,rangeEnd);
  if(!chartBaseBars.length){$("chartStatus").textContent="關聯區間沒有 K 線";return;}
  const maxVisible=chartBaseBars.length,minVisible=Math.min(12,maxVisible),visible=Math.max(minVisible,Math.min(maxVisible,Math.round(maxVisible/chartZoom)));
  chartOffset=Math.max(0,Math.min(maxVisible-visible,chartOffset));
