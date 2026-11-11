@@ -105,9 +105,14 @@ function periodBounds(period,now=new Date()){
  return {start:start.getTime(),end:end.getTime()};
 }
 let activeStatsPeriod="week";
+function effectiveExitPnl(exit,events){
+ const corrections=events.filter(e=>e.event_type==="amendment"&&e.target_entry_id===exit.entry_id&&!eventVoided(e.entry_id,events)&&e.context?.amendment_kind==="pnl_correction"&&typeof e.context.corrected_realized_pnl_twd==="number"&&Number.isFinite(e.context.corrected_realized_pnl_twd));
+ corrections.sort((a,b)=>Date.parse(a.recorded_at)-Date.parse(b.recorded_at));
+ return corrections.length?corrections[corrections.length-1].context.corrected_realized_pnl_twd:exit.context?.realized_pnl_twd;
+}
 function completedTrades(){
  const tids=[...new Set(db.events.filter(e=>e.trade_id).map(e=>e.trade_id))],out=[];
- for(const tid of tids){const es=tradeEvents(tid),exits=es.filter(e=>e.event_type==="exit"&&!eventVoided(e.entry_id,es));if(exits.length!==1)continue;const e=exits[0],p=e.context?.realized_pnl_twd;if(typeof p!=="number"||!Number.isFinite(p))continue;const ms=Date.parse(e.market_timestamp||e.recorded_at);if(Number.isFinite(ms))out.push({p,ms});}
+ for(const tid of tids){const es=tradeEvents(tid),exits=es.filter(e=>e.event_type==="exit"&&!eventVoided(e.entry_id,es));if(exits.length!==1)continue;const e=exits[0],p=effectiveExitPnl(e,es);if(typeof p!=="number"||!Number.isFinite(p))continue;const ms=Date.parse(e.market_timestamp||e.recorded_at);if(Number.isFinite(ms))out.push({p,ms});}
  return out;
 }
 function renderStats(){
@@ -134,7 +139,9 @@ function render(){
  es.forEach(e=>{
   const d=document.createElement("div");d.className="event";
   const strong=document.createElement("strong");strong.textContent=labels[e.event_type]||e.event_type;
-  const p=document.createElement("p");p.textContent=e.narrative;if(e.event_type==="exit"&&typeof e.context?.realized_pnl_twd==="number"){const pnl=document.createElement("small");pnl.textContent="實際淨損益："+(e.context.realized_pnl_twd>0?"+":"")+"$"+e.context.realized_pnl_twd.toLocaleString("zh-TW");pnl.style.color=e.context.realized_pnl_twd>0?"#71d6a0":e.context.realized_pnl_twd<0?"#ff8d8d":"#9aaabd";d.append(pnl);}
+  const p=document.createElement("p");p.textContent=e.narrative;
+  if(e.event_type==="exit"&&typeof e.context?.realized_pnl_twd==="number"){const pnl=document.createElement("small");const effective=effectiveExitPnl(e,es);pnl.textContent="原始淨損益："+(e.context.realized_pnl_twd>0?"+":"")+"$"+e.context.realized_pnl_twd.toLocaleString("zh-TW")+(effective!==e.context.realized_pnl_twd?" · 最新修正："+(effective>0?"+":"")+"$"+effective.toLocaleString("zh-TW"):"");pnl.style.color=effective>0?"#71d6a0":effective<0?"#ff8d8d":"#9aaabd";d.append(pnl);}
+  if(e.event_type==="amendment"&&e.context?.amendment_kind==="pnl_correction"){const cp=document.createElement("small");cp.textContent="損益修正為："+(e.context.corrected_realized_pnl_twd>0?"+":"")+"$"+e.context.corrected_realized_pnl_twd.toLocaleString("zh-TW");cp.style.color="#79b8ff";d.append(cp);}
   const time=document.createElement("small");time.textContent=new Date(e.recorded_at).toLocaleString();d.append(strong,time,p);
   if(e.target_entry_id){const target=document.createElement("small");target.textContent="對應紀錄："+e.target_entry_id;d.append(target);}
   if(!["amendment","void"].includes(e.event_type)&&eventVoided(e.entry_id,es)){const mark=document.createElement("small");mark.textContent="此紀錄已標記作廢，原始內容仍保留";mark.style.color="#ff8d8d";d.append(mark);}
@@ -143,6 +150,10 @@ function render(){
   if(!["amendment","void"].includes(e.event_type)&&!eventVoided(e.entry_id,es)){
    const actions=document.createElement("div");actions.className="actions";
    const amend=document.createElement("button");amend.textContent="追加修正";amend.onclick=()=>{const text=prompt("請輸入更正或補充內容（原始紀錄不會被覆寫）：");if(text&&text.trim()){db.events.push({entry_id:uid("jrn"),event_type:"amendment",recorded_at:new Date().toISOString(),market_timestamp:null,trade_id:selected,target_entry_id:e.entry_id,narrative:text.trim(),context:{},attachments:[]});persist();}};
+   if(e.event_type==="exit"&&typeof e.context?.realized_pnl_twd==="number"){
+    const correct=document.createElement("button");correct.textContent="修正損益";correct.onclick=()=>{const current=effectiveExitPnl(e,es),raw=prompt("請輸入正確的實際淨損益（新台幣）。原始數字會保留，統計改採最新有效修正。",String(current));if(raw===null)return;const value=Number(raw);if(raw.trim()===""||!Number.isFinite(value))return alert("請輸入有效數字");const reason=prompt("請簡述修正原因（必填）：");if(!reason||!reason.trim())return alert("請填寫修正原因");db.events.push({entry_id:uid("jrn"),event_type:"amendment",recorded_at:new Date().toISOString(),market_timestamp:null,trade_id:selected,target_entry_id:e.entry_id,narrative:reason.trim(),context:{amendment_kind:"pnl_correction",corrected_realized_pnl_twd:value},attachments:[]});persist();};
+    actions.append(correct);
+   }
    const voidBtn=document.createElement("button");voidBtn.textContent="標記作廢";voidBtn.onclick=()=>{if(confirm("標記作廢後，原始紀錄仍會保留並顯示稽核標記。確定？")){db.events.push({entry_id:uid("jrn"),event_type:"void",recorded_at:new Date().toISOString(),market_timestamp:null,trade_id:selected,target_entry_id:e.entry_id,narrative:"使用者標記此紀錄作廢",context:{},attachments:[]});persist();}};
    actions.append(amend,voidBtn);d.append(actions);
   }
