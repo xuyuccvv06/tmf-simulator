@@ -44,6 +44,15 @@ test('daily 4 percent loss and 5/9/12 loss warnings enforce the entry gate', () 
   assert.match(html, /風控已封鎖今日新增進場/);
 });
 
+test('margin calls persist to the next trading-day noon and pause with replay time', () => {
+  assert.match(html, /function evaluateMarginCall\(bar\)/);
+  assert.match(html, /dates\.find\(d=>d>bar\.d\)/);
+  assert.match(html, /deadline:next\+" 12:00"/);
+  assert.match(html, /保證金追繳期限屆滿強制平倉/);
+  assert.match(html, /marginCallStatus/);
+  assert.match(html, /marginCall, replayRisk/);
+});
+
 test('formal mode cumulative stats use only revealed completed exits from the active dataset', () => {
   assert.match(html, /formalPerformancePanel/);
   assert.match(html, /replay_dataset_id:replayDatasetId/);
