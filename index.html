@@ -53,6 +53,25 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
   <button id="cursorLatest" type="button" style="flex:none">最新</button>
  </div>
  <div class="note" style="margin-top:8px">可拖曳滑桿或點擊圖表上的 K 線移動十字線，查看該根 K 線的時間、開盤、最高、最低、收盤。只允許選取已揭露的 K 線。</div>
+ <div class="stat" style="margin-top:12px"><small>下單前設定</small><b>進場前設定停損／停利距離</b></div>
+ <div class="trade-record" style="margin-top:8px">
+  <div><label for="stopLossPoints">停損距離（點，可留空）</label><input id="stopLossPoints" type="number" min="0" step="0.1" inputmode="decimal" placeholder="不設定"></div>
+  <div><label for="takeProfitPoints">停利距離（點，可留空）</label><input id="takeProfitPoints" type="number" min="0" step="0.1" inputmode="decimal" placeholder="不設定"></div>
+ </div>
+ <div class="row" style="margin-top:10px">
+  <button id="buy" class="primary">市價做多</button>
+  <button id="sell" style="background:#71363a;border-color:#9a4b50">市價做空</button>
+  <button id="close" disabled>市價平倉</button>
+ </div>
+ <p class="note" id="orderStatus" style="margin:9px 0 0">目前空手。每次固定 1 口；送單後於下一根已揭露 K 線的開盤價成交。</p>
+ <div id="positionManager" class="trade-record" style="margin-top:10px;display:none">
+  <div class="stat full"><small>成交後持倉管理</small><b>成交後設定／修改停損與停利價格</b></div>
+  <div><label for="managedStopPrice">停損價格</label><input id="managedStopPrice" type="number" step="1" inputmode="decimal" placeholder="輸入停損價"></div>
+  <div><label for="managedTargetPrice">停利價格</label><input id="managedTargetPrice" type="number" step="1" inputmode="decimal" placeholder="輸入停利價"></div>
+  <div class="row full"><button id="applyStop" class="primary">確認停損</button><button id="applyTarget">確認停利</button></div>
+  <p class="note full" id="managementStatus">多單停損只能上移；空單停損只能下移。停損不提供放寬或清除。</p>
+ </div>
+ <p class="note" style="margin-top:8px">開倉前可設定停損／停利距離；成交後可在持倉管理區直接輸入價格。停損只能往獲利方向移動，不可放寬；停利可調整。若同一根 K 線同時觸及兩者，採停損優先；開盤跳空越過觸發價，按開盤價模擬成交。</p>
  <button id="latest" type="button" style="margin-top:8px;flex:none">回到最新 K 線</button>
 </section>
 <section class="panel">
@@ -89,24 +108,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
   <div class="stat"><small>停利價</small><b id="targetPrice">—</b></div>
   <div class="stat"><small>目前收盤</small><b id="tradeCurrentClose">—</b></div>
  </div>
- <div class="trade-record" style="margin-top:10px">
-  <div><label for="stopLossPoints">停損距離（點，可留空）</label><input id="stopLossPoints" type="number" min="0" step="0.1" inputmode="decimal" placeholder="不設定"></div>
-  <div><label for="takeProfitPoints">停利距離（點，可留空）</label><input id="takeProfitPoints" type="number" min="0" step="0.1" inputmode="decimal" placeholder="不設定"></div>
- </div>
- <p class="note">開倉前可設定停損／停利距離；成交後也可在下方直接輸入價格管理。停損只能往獲利方向移動，不可放寬；停利可調整。若同一根 K 線同時觸及兩者，採停損優先；開盤跳空越過觸發價，按開盤價模擬成交。</p>
- <div id="positionManager" class="trade-record" style="margin-top:10px;display:none">
-  <div class="stat full"><small>持倉管理</small><b>成交後設定／修改價格（直接輸入價格）</b></div>
-  <div><label for="managedStopPrice">停損價格</label><input id="managedStopPrice" type="number" step="1" inputmode="decimal" placeholder="輸入停損價"></div>
-  <div><label for="managedTargetPrice">停利價格</label><input id="managedTargetPrice" type="number" step="1" inputmode="decimal" placeholder="輸入停利價"></div>
-  <div class="row full"><button id="applyStop" class="primary">確認停損</button><button id="applyTarget">確認停利</button></div>
-  <p class="note full" id="managementStatus">多單停損只能上移；空單停損只能下移。停損不提供放寬或清除。</p>
- </div>
- <div class="row" style="margin-top:10px">
-  <button id="buy" class="primary">市價做多</button>
-  <button id="sell" style="background:#71363a;border-color:#9a4b50">市價做空</button>
-  <button id="close" disabled>市價平倉</button>
- </div>
- <p class="note" id="orderStatus" style="margin:9px 0 0">目前空手。每次固定 1 口；送單後於下一根已揭露 K 線的開盤價成交。</p>
+
  <div style="margin-top:14px"><b>最近一筆完整交易</b>
   <div class="trade-record">
    <div class="stat"><small>進場時間</small><b id="recordEntryTime">—</b></div>
