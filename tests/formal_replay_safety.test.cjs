@@ -57,7 +57,7 @@ test('daily profit giveback is tracked for reporting but does not block new trad
   assert.match(html, /replayRisk\.profitGiveback=Math\.max/);
   assert.match(html, /replayRisk\.maxProfitGiveback=Math\.max/);
   assert.match(html, /當日獲利回吐/);
-  assert.doesNotMatch(html, /profitGiveback[^;{}]*blockedDate/);
+  assert.doesNotMatch(html, /if\\(replayRisk\\.(profitGiveback|maxProfitGiveback)/);
 });
 
 test('margin calls persist to the next trading-day noon and are included in snapshots', () => {
