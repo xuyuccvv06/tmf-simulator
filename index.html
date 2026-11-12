@@ -74,8 +74,10 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
  <p class="note" id="marginStatus" style="margin-top:9px">保證金狀態：—</p>
  <div class="trade-record"><div><label for="depositAmount">追加資金（新臺幣）</label><input id="depositAmount" type="number" min="1" step="1" inputmode="numeric" placeholder="輸入入金金額"></div><div style="display:flex;align-items:end"><button id="depositButton" class="primary">確認入金</button></div></div>
  <div class="trade-record"><div><label for="initialMarginInput">每口原始保證金（元）</label><input id="initialMarginInput" type="number" min="1" step="1" inputmode="numeric"></div><div><label for="maintenanceMarginInput">每口維持保證金（元）</label><input id="maintenanceMarginInput" type="number" min="1" step="1" inputmode="numeric"></div><div class="full"><button id="saveMarginSettings">儲存保證金參數</button></div></div>
+ <div class="trade-record"><div class="full"><b>期交所歷史保證金查詢（TMF）</b></div><div><label for="marginHistoryDate">查詢日期（當日收盤後）</label><input id="marginHistoryDate" type="date" min="2024-07-29" max="2025-12-31"></div><div style="display:flex;align-items:end"><button id="lookupHistoricalMargin">查詢歷史數值</button></div><div id="historicalMarginResult" class="stat full"><small>查詢結果</small><b>請選擇日期後查詢。</b></div><div class="full"><button id="applyHistoricalMargin" disabled>套用查詢結果的原始／維持保證金</button></div></div>
+ <details class="note" style="margin-top:8px"><summary>查看 2024/07/29–2025/12/31 全部調整紀錄</summary><div id="historicalMarginTable" style="overflow-x:auto;margin-top:8px">歷史資料載入中…</div></details>
  <div class="note" id="accountLedger" style="margin-top:9px">資金異動紀錄載入中…</div>
- <div class="trade-record" style="margin-top:10px"><div><label for="commissionPerSide">每邊手續費（元／口）</label><input id="commissionPerSide" type="number" min="0" step="1" inputmode="decimal"></div><div><label for="baseSlippage">基礎滑價（點／邊）</label><input id="baseSlippage" type="number" min="0" step="0.1" inputmode="decimal"></div><div><label for="rangeSlippage">K 線振幅係數</label><input id="rangeSlippage" type="number" min="0" max="1" step="0.01" inputmode="decimal"></div><div><label for="lowVolumePenalty">低量加成（點／邊）</label><input id="lowVolumePenalty" type="number" min="0" step="0.1" inputmode="decimal"></div><div class="full"><label style="display:flex;align-items:center;gap:8px"><input id="dynamicSlippage" type="checkbox" style="width:auto">啟用動態滑價（當根振幅＋前 20 根成交量中位數）</label></div><div class="full"><button id="saveCostSettings">儲存交易成本設定</button></div></div><p class="note">成本模型：期交稅按進出場成交價各計 0.00002，乘數 NT$10／點；手續費由你輸入券商實際費率。滑價以每邊點數計，動態模式只使用成交當根振幅及此前 20 根成交量，不讀取未來 K 線。動態滑價是 OHLCV 估計值，並非委託簿實際成交模型。歷史保證金仍採手動設定，未經官方逐次公告核對前不自動套用。</p>
+ <div class="trade-record" style="margin-top:10px"><div><label for="commissionPerSide">每邊手續費（元／口）</label><input id="commissionPerSide" type="number" min="0" step="1" inputmode="decimal"></div><div><label for="baseSlippage">基礎滑價（點／邊）</label><input id="baseSlippage" type="number" min="0" step="0.1" inputmode="decimal"></div><div><label for="rangeSlippage">K 線振幅係數</label><input id="rangeSlippage" type="number" min="0" max="1" step="0.01" inputmode="decimal"></div><div><label for="lowVolumePenalty">低量加成（點／邊）</label><input id="lowVolumePenalty" type="number" min="0" step="0.1" inputmode="decimal"></div><div class="full"><label style="display:flex;align-items:center;gap:8px"><input id="dynamicSlippage" type="checkbox" style="width:auto">啟用動態滑價（前一根振幅＋前 20 根成交量）</label></div><div class="full"><button id="saveCostSettings">儲存交易成本設定</button></div></div><p class="note">成本模型：期交稅按進出場成交價各計 0.00002，乘數 NT$10／點；手續費由你輸入券商實際費率。滑價以每邊點數計，動態模式只使用成交前已完成 K 線：前一根振幅、前 20 根成交量中位數及最近一根成交量；完全不使用成交當根尚未完成的 OHLCV，避免前視偏誤。動態滑價是歷史 OHLCV 估計值，並非委託簿實際成交模型；停利限價單不套用市價不利滑價。歷史保證金可查期交所公告並手動套用；不會自動覆蓋既有帳戶設定，期貨商可能另行加收。</p>
 </section>
 <section class="panel">
  <b>模擬交易（市價單）</b>
@@ -115,7 +117,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
    <div class="stat full"><small>出場原因</small><b id="recordExitReason">—</b></div>
   </div>
  </div>
- <p class="note">測試版暫不計入手續費、期交稅與滑價；損益先以點數顯示。停損／停利依每根 K 線 OHLC 模擬觸發，同根同時觸及時採停損優先。一次只允許一筆持倉，不支援加碼或反手。</p>
+ <p class="note">淨損益已計入每邊手續費、雙邊期交稅及設定滑價。市價進出場與停損／強制平倉採不利滑價；停利視為限價單，觸價依停利價成交，跳空有利時依開盤價成交，不額外加不利滑價。一次只允許一筆持倉，不支援加碼或反手。</p>
 </section>
 <section class="panel">
  <b>選擇訓練場次</b>
@@ -131,7 +133,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
 </section>
 <section class="panel">
  <b>版本說明與限制</b>
- <p class="note">目前為市價單測試版：每次固定 1 口，送單後於下一根已揭露 K 線的開盤價成交；可設定停損與停利距離。回放依時間連續跨日期與盤別，持倉不因跨日清空。暫不計手續費、期交稅與滑價；主畫面保留最近一筆完整交易，詳細行為紀錄請使用獨立頁面。</p>
+ <p class="note">目前為市價單測試版：每次固定 1 口，送單後於下一根已揭露 K 線的開盤價成交；可設定停損與停利距離。回放依時間連續跨日期與盤別，持倉不因跨日清空。淨損益計入可調手續費、期交稅及滑價；主畫面保留最近一筆完整交易，詳細行為紀錄請使用獨立頁面。</p>
  <p class="note">資料來源：使用者提供的 TMFR1 5 分鐘 CSV。若資料缺少時段，回放會保留實際時間順序，不會補造 K 線。</p>
 </section>
 </main>
@@ -156,7 +158,7 @@ function loadAccount(){
 let account=loadAccount(),marginLiquidationPending=false;
 const money=n=>"NT$"+Math.round(n).toLocaleString("zh-TW");
 function saveAccount(){localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}
-function accountUnrealized(){const last=revealed?bars[revealed-1]:null;return position&&last?(last.c-position.entry)*(position.side==="多"?1:-1)*10:0;}
+function accountUnrealized(){const last=revealed?bars[revealed-1]:null;if(!position||!last)return 0;const mark=adverseFill(last.c,position.side,last),gross=(mark-position.entry)*(position.side==="多"?1:-1)*10,c=costSettings(),tax=(position.entry+mark)*10*0.00002,commission=2*c.commission_per_side;return gross-tax-commission;}
 function accountMetrics(){const qty=position?1:0,u=accountUnrealized(),equity=account.balance+u;return {qty,u,equity,initialUsed:account.initial_margin_per_contract*qty,maintenance:account.maintenance_margin_per_contract*qty,available:equity-account.initial_margin_per_contract*qty};}
 function renderAccount(){
  renderCostSettings();
@@ -170,10 +172,14 @@ function renderAccount(){
 function addAccountLedger(type,amount,note){account.ledger.push({type,amount,recorded_at:new Date().toISOString(),note:note||""});saveAccount();}
 function depositFunds(){const raw=$("depositAmount").value.trim(),amount=Number(raw);if(!raw||!Number.isSafeInteger(amount)||amount<=0){$("marginStatus").textContent="入金失敗：請輸入大於 0 的整數金額。";return;}account.balance+=amount;addAccountLedger("deposit",amount,"使用者手動追加資金");$("depositAmount").value="";renderAccount();$("marginStatus").textContent="入金成功："+money(amount)+"；已計入帳戶餘額。";}
 function saveMarginSettings(){const initial=Number($("initialMarginInput").value),maintenance=Number($("maintenanceMarginInput").value);if(!Number.isSafeInteger(initial)||!Number.isSafeInteger(maintenance)||initial<=0||maintenance<=0||initial<maintenance){$("marginStatus").textContent="保證金參數無效：原始保證金與維持保證金須為正整數，且原始不得低於維持。";return;}account.initial_margin_per_contract=initial;account.maintenance_margin_per_contract=maintenance;saveAccount();renderAccount();$("marginStatus").textContent="保證金參數已保存。";}
+let historicalMarginRows=[],selectedHistoricalMargin=null;
+async function loadHistoricalMarginData(){try{const res=await fetch('./data/tmf_margin_history_2024-2025.json');if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();if(data.contract!=='TMF'||!Array.isArray(data.records)||!data.records.length)throw new Error('歷史保證金資料格式錯誤');historicalMarginRows=data.records.slice().sort((a,b)=>a.effective_date.localeCompare(b.effective_date));const fmt=n=>'TWD '+Number(n).toLocaleString('zh-TW');$('historicalMarginTable').innerHTML='<table style="width:100%;border-collapse:collapse;white-space:nowrap;font-size:12px"><thead><tr><th style="text-align:left;padding:6px">生效日（首筆為上市日）</th><th style="text-align:right;padding:6px">原始</th><th style="text-align:right;padding:6px">維持</th><th style="text-align:right;padding:6px">結算</th><th style="padding:6px">來源</th></tr></thead><tbody>'+historicalMarginRows.map(r=>'<tr><td style="padding:6px;border-top:1px solid #263545">'+r.effective_date+'</td><td style="text-align:right;padding:6px;border-top:1px solid #263545">'+fmt(r.initial)+'</td><td style="text-align:right;padding:6px;border-top:1px solid #263545">'+fmt(r.maintenance)+'</td><td style="text-align:right;padding:6px;border-top:1px solid #263545">'+fmt(r.settlement)+'</td><td style="padding:6px;border-top:1px solid #263545"><a target="_blank" rel="noopener" style="color:#67a9ff" href="'+r.source+'">公告</a></td></tr>').join('')+'</tbody></table><p>共 '+historicalMarginRows.length+' 筆調整紀錄；未調整日期沿用前次數值。</p>';}catch(e){$('historicalMarginTable').textContent='歷史保證金資料載入失敗：'+e.message;}}
+function lookupHistoricalMargin(){const date=$('marginHistoryDate').value;if(!date){$('historicalMarginResult').innerHTML='<small>查詢結果</small><b>請先選擇日期。</b>';return;}const rows=historicalMarginRows.filter(r=>r.effective_date<=date);if(!rows.length){selectedHistoricalMargin=null;$('applyHistoricalMargin').disabled=true;$('historicalMarginResult').innerHTML='<small>查詢結果</small><b>資料起始日為 2024/07/29，沒有更早的紀錄。</b>';return;}selectedHistoricalMargin=rows[rows.length-1];const r=selectedHistoricalMargin,fmt=n=>'TWD '+Number(n).toLocaleString('zh-TW');$('historicalMarginResult').innerHTML='<small>截至 '+date+' 一般交易時段收盤後適用的最近數值（'+r.effective_date+'）</small><b>原始 '+fmt(r.initial)+'　維持 '+fmt(r.maintenance)+'　結算 '+fmt(r.settlement)+'</b><small style="display:block;margin-top:5px">首筆為上市日基準；其他新值自公告指定日期的一般交易時段收盤後起適用，該日收盤前日盤仍沿用前一筆。夜盤交易日歸屬請依期交所交易日規則判讀。</small><a target="_blank" rel="noopener" style="color:#67a9ff" href="'+r.source+'">查看公告來源</a>';$('applyHistoricalMargin').disabled=false;}
+function applyHistoricalMargin(){if(!selectedHistoricalMargin)return;const r=selectedHistoricalMargin;$('initialMarginInput').value=r.initial;$('maintenanceMarginInput').value=r.maintenance;saveMarginSettings();$('marginStatus').textContent='已套用期交所歷史參考值（'+r.effective_date+'）：原始 TWD '+Number(r.initial).toLocaleString('zh-TW')+'／維持 TWD '+Number(r.maintenance).toLocaleString('zh-TW')+'；結算保證金 TWD '+Number(r.settlement).toLocaleString('zh-TW')+' 僅供查閱。期貨商可能另行加收保證金。'}
 function costSettings(){if(!account.costs)account.costs={commission_per_side:0,base_slippage:0,range_slippage:0,low_volume_penalty:0,dynamic_slippage:false};return account.costs;}
 function saveCostSettings(){const vals={commission_per_side:Number($("commissionPerSide").value),base_slippage:Number($("baseSlippage").value),range_slippage:Number($("rangeSlippage").value),low_volume_penalty:Number($("lowVolumePenalty").value)};if(Object.values(vals).some(v=>!Number.isFinite(v)||v<0)||vals.range_slippage>1){$("marginStatus").textContent="成本參數無效：請輸入非負數，振幅係數不得超過 1。";return;}account.costs={...vals,dynamic_slippage:$("dynamicSlippage").checked};saveAccount();$("marginStatus").textContent="交易成本設定已保存。";}
-function renderCostSettings(){const c=costSettings();$("commissionPerSide").value=c.commission_per_side;$("baseSlippage").value=c.base_slippage;$("rangeSlippage").value=c.range_slippage;$("lowVolumePenalty").value=c.low_volume_penalty;$("dynamicSlippage").checked=!!c.dynamic_slippage;}
-function estimatedSlippage(bar){const c=costSettings();if(!c.dynamic_slippage)return c.base_slippage;const idx=bars.findIndex(x=>x.t===bar.t),prior=bars.slice(Math.max(0,idx-20),idx).map(x=>x.v).filter(v=>Number.isFinite(v)&&v>0).sort((a,b)=>a-b);const median=prior.length?prior[Math.floor(prior.length/2)]:0;return c.base_slippage+Math.max(0,bar.h-bar.l)*c.range_slippage+(median>0&&bar.v<median*0.5?c.low_volume_penalty:0);}
+function renderCostSettings(){const c=costSettings();for(const [id,key] of [["commissionPerSide","commission_per_side"],["baseSlippage","base_slippage"],["rangeSlippage","range_slippage"],["lowVolumePenalty","low_volume_penalty"]]){const el=$(id);if(document.activeElement!==el)el.value=c[key];}const toggle=$("dynamicSlippage");if(document.activeElement!==toggle)toggle.checked=!!c.dynamic_slippage;}
+function estimatedSlippage(bar){const c=costSettings();if(!c.dynamic_slippage)return c.base_slippage;const idx=bars.findIndex(x=>x.t===bar.t),priorBars=bars.slice(Math.max(0,idx-20),idx),priorVolumes=priorBars.map(x=>x.v).filter(v=>Number.isFinite(v)&&v>0).sort((a,b)=>a-b),median=priorVolumes.length?priorVolumes[Math.floor(priorVolumes.length/2)]:0,previous=priorBars.length?priorBars[priorBars.length-1]:null,previousRange=previous?Math.max(0,previous.h-previous.l):0,previousVolume=previous&&Number.isFinite(previous.v)?previous.v:0;return c.base_slippage+previousRange*c.range_slippage+(median>0&&previousVolume<median*0.5?c.low_volume_penalty:0);}
 function adverseFill(price,side,bar){const slip=estimatedSlippage(bar);return price+(side==="多"?-slip:slip);}
 function checkMargin(){if(!position||marginLiquidationPending||!account.maintenance_margin_per_contract)return;const m=accountMetrics();if(m.equity<m.maintenance){marginLiquidationPending=true;$("orderStatus").textContent="帳戶權益低於維持保證金，已排定下一根 K 線開盤強制平倉。";renderAccount();}}
 
@@ -225,7 +231,7 @@ function readDistance(id){
  if(!Number.isFinite(value)||value<=0)throw new Error('停損／停利距離必須是大於 0 的有限數字，或留空不設定。');
  return value;
 }
-function saveSimulationTrade(closed,fill,time,reason,pts){
+function saveSimulationTrade(closed,fill,time,reason,pts,costBreakdown={}){
  const key="tmf.behaviourJournal."+SIM_MODE+".v1",legacyKey="tmf.behaviourJournal.v1";
   let saved=JSON.parse(localStorage.getItem(key)||"null");
   if(!saved&&SIM_MODE==="practice"){saved=JSON.parse(localStorage.getItem(legacyKey)||'{"version":1,"events":[]}');localStorage.setItem(key,JSON.stringify(saved));}
@@ -236,7 +242,7 @@ function saveSimulationTrade(closed,fill,time,reason,pts){
  const from=Math.max(0,Math.min(entryIndex,exitIndex)-30),to=Math.min(bars.length,Math.max(entryIndex,exitIndex)+31);
  const snapshotBars=bars.slice(from,to).map(b=>({timestamp:new Date(b.t).toISOString(),open:b.o,high:b.h,low:b.l,close:b.c,volume:Number.isFinite(b.v)?b.v:0}));
  const iso=t=>new Date(t).toISOString(),tradeId="sim_"+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
- const title="盤感回放 "+closed.side+"單 · "+iso(closed.entryTime).slice(0,10),common={simulation_source:"tmf_simulator",side:closed.side,entry_price:closed.entry,exit_price:fill,realized_points:pts,exit_reason:reason,stop_history:closed.stopHistory||[],target_history:closed.targetHistory||[]};
+ const title="盤感回放 "+closed.side+"單 · "+iso(closed.entryTime).slice(0,10),common={simulation_source:"tmf_simulator",side:closed.side,entry_price:closed.entry,exit_price:fill,realized_points:pts,realized_pnl_twd:Number.isFinite(costBreakdown.net_twd)?costBreakdown.net_twd:null,cost_breakdown:costBreakdown,exit_reason:reason,stop_history:closed.stopHistory||[],target_history:closed.targetHistory||[]};
  const replay_snapshot={timeframe:"5 分鐘",bars:snapshotBars,entry_timestamp:iso(closed.entryTime),exit_timestamp:iso(time)};
  saved.events.push(
   {entry_id:"jrn_"+tradeId+"_entry",event_type:"entry",recorded_at:new Date().toISOString(),market_timestamp:iso(closed.entryTime),trade_id:tradeId,narrative:"盤感回放自動紀錄：進場 "+closed.side+"單 @ "+closed.entry,context:{...common,title,replay_snapshot},attachments:[]},
@@ -270,13 +276,15 @@ function applyManagedTarget(){
  $('managementStatus').textContent='停利已更新：'+(old===null?'首次設定':old.toLocaleString('en-US')+' →')+' '+next.toLocaleString('en-US')+'。' ;
  $('managedTargetPrice').value='';updateTradeUI();
 }
-function finishPosition(fill,time,reason){
+function finishPosition(fill,time,reason,execution='market'){
  if(!position)return;
- const closed=position,exitBar=bars.find(x=>x.t===time),actualFill=exitBar?adverseFill(fill,closed.side,exitBar):fill,pts=(actualFill-closed.entry)*(closed.side==='多'?1:-1);
+ const closed=position,exitBar=bars.find(x=>x.t===time),actualFill=exitBar&&execution==='market'?adverseFill(fill,closed.side,exitBar):fill,pts=(actualFill-closed.entry)*(closed.side==='多'?1:-1);
  const c=costSettings(),commission=2*c.commission_per_side,tax=(closed.entry+actualFill)*10*0.00002,totalCost=commission+tax,netTwd=pts*10-totalCost,netPoints=netTwd/10;
+ const entryBar=bars.find(x=>x.t===closed.entryTime),entrySlippage=entryBar?Math.abs(closed.entry-entryBar.o):0,exitSlippage=execution==='market'&&exitBar?Math.abs(actualFill-fill):0;
  realizedPoints+=netPoints;account.balance+=netTwd;addAccountLedger('realized_pnl',netTwd,'模擬交易淨損益（已扣手續費、期交稅及滑價）');
- lastTrade={side:closed.side,entryTime:closed.entryTime,entry:closed.entry,exitTime:time,exit:actualFill,points:netPoints,grossPoints:pts,commission:commission,tax:tax,exitReason:reason};
- try{saveSimulationTrade(closed,actualFill,time,reason,netPoints);}
+ const tradeCosts={gross_points:pts,net_points:netPoints,net_twd:netTwd,commission_twd:commission,futures_tax_twd:tax,entry_slippage_points:entrySlippage,exit_slippage_points:exitSlippage,exit_execution:execution};
+ lastTrade={side:closed.side,entryTime:closed.entryTime,entry:closed.entry,exitTime:time,exit:actualFill,points:netPoints,grossPoints:pts,commission:commission,tax:tax,exitReason:reason,...tradeCosts};
+ try{saveSimulationTrade(closed,actualFill,time,reason,netPoints,tradeCosts);}
  catch(err){$('orderStatus').textContent+='｜交易歷史保存失敗：'+err.message;}
  $('orderStatus').textContent=`${closed.side}單已出場（${reason}）｜進場 ${closed.entryTime} @ ${closed.entry.toLocaleString('en-US')}｜出場 ${time} @ ${actualFill.toLocaleString('en-US')}｜淨損益 ${netPoints>=0?'+':''}${netPoints.toFixed(1)} 點`;
  position=null;
@@ -287,11 +295,11 @@ function evaluateStops(bar){
  const stopGap=p.stopLoss!==null&&(long?bar.o<=p.stopLoss:bar.o>=p.stopLoss);
  const targetGap=p.takeProfit!==null&&(long?bar.o>=p.takeProfit:bar.o<=p.takeProfit);
  if(stopGap){finishPosition(bar.o,bar.t,'跳空停損');return}
- if(targetGap){finishPosition(bar.o,bar.t,'跳空停利');return}
+ if(targetGap){finishPosition(bar.o,bar.t,'跳空停利','limit');return}
  const stopHit=p.stopLoss!==null&&(long?bar.l<=p.stopLoss:bar.h>=p.stopLoss);
  const targetHit=p.takeProfit!==null&&(long?bar.h>=p.takeProfit:bar.l<=p.takeProfit);
  if(stopHit){finishPosition(p.stopLoss,bar.t,stopHit&&targetHit?'同根觸及停損停利，保守採停損':'停損');return}
- if(targetHit){finishPosition(p.takeProfit,bar.t,'停利');}
+ if(targetHit){finishPosition(p.takeProfit,bar.t,'停利','limit');}
 }
 function placeMarketOrder(type){
  if(pendingOrder){$('orderStatus').textContent='已有一筆待成交委託，請先等待下一根 K 線。';return}
@@ -365,11 +373,12 @@ $('cursorLatest').onclick=()=>{selectedIndex=Math.max(0,revealed-1);$('barCursor
 $('buy').onclick=()=>placeMarketOrder('buy');$('sell').onclick=()=>placeMarketOrder('sell');$('close').onclick=()=>placeMarketOrder('close');
 $('step').onclick=step;$('play').onclick=play;$('applyStop').onclick=applyManagedStop;$('applyTarget').onclick=applyManagedTarget;$('reset').onclick=()=>loadDate($('session').value);$('speed').onchange=()=>{if(timer){stop();play()}};$('visible').onchange=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);if(selectedIndex<viewStart)selectedIndex=viewStart;render()};$('latest').onclick=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);render()};$('session').onchange=()=>loadDate($('session').value);$('replayMode').onchange=()=>loadDate($('session').value);$('newSession').onclick=()=>{const d=dates[Math.floor(Math.random()*dates.length)];$('session').value=d;loadDate(d)};
 async function init(){try{setStatus('正在載入 CSV…');const res=await fetch('./TMFR1_5min_2024-2025.csv');if(!res.ok)throw new Error(`CSV 載入失敗：HTTP ${res.status}`);const rawCsv=await res.text();all=parseCSV(rawCsv);if(!all.length)throw new Error('CSV 沒有可用行情');all.sort((a,b)=>a.t.localeCompare(b.t));let backupSync='';try{const saved=await saveReplayDatasetToJournalDB(rawCsv,all);backupSync=`・完整行情已同步備份（${saved.rowCount.toLocaleString()} 根）`;}catch(syncError){backupSync='・行情備份同步失敗：'+syncError.message;}dates=[...new Set(all.filter(x=>x.t.slice(11,16)>='08:45'&&x.t.slice(11,16)<='13:45').map(x=>x.t.slice(0,10)))].sort();dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;$('session').appendChild(o)});$('session').value=dates[0];loadDate(dates[0]);setStatus(`資料載入完成・${all.length.toLocaleString()} 根${backupSync}`)}catch(e){setStatus('載入失敗');const msg=document.createElement('p');msg.className='note';msg.style.color='#f06468';msg.textContent=e.message+'。請確認 CSV 與 HTML 位於同一個 GitHub Repository 根目錄，並透過 GitHub Pages 網址開啟。';document.querySelector('main').prepend(msg)}}
-$("depositButton").onclick=depositFunds;$("saveMarginSettings").onclick=saveMarginSettings;$("saveCostSettings").onclick=saveCostSettings;
+$("depositButton").onclick=depositFunds;$("saveMarginSettings").onclick=saveMarginSettings;$("saveCostSettings").onclick=saveCostSettings;$("lookupHistoricalMargin").onclick=lookupHistoricalMargin;$("applyHistoricalMargin").onclick=applyHistoricalMargin;
 $("modeSelector").value=SIM_MODE;
 $("modeSelector").onchange=()=>{if(position||pendingOrder){alert("請先平倉並取消待成交委託，再切換模式，避免持倉狀態遺失。");$("modeSelector").value=SIM_MODE;return;}location.href="./index.html?mode="+$("modeSelector").value;};
 $("replayNav").href="./index.html?mode="+SIM_MODE;$("journalNav").href="./trade_journal.html?mode="+SIM_MODE;
 document.querySelector("header h1").insertAdjacentHTML("beforeend",' <span class="tag">'+MODE_LABEL+'</span>');
+loadHistoricalMarginData();
 init();
 </script>
 </body></html>

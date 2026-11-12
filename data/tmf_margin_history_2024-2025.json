@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "contract": "TMF",
+  "currency": "TWD",
+  "point_value_twd": 10,
+  "period_start": "2024-07-29",
+  "period_end": "2025-12-31",
+  "effective_rule": "2024-07-29 為 TMF 上市日基準；其後各筆公告調整均自指定日期一般交易時段結束後起實施，未調整日期沿用前次數值。春節臨時加收亦依公告列入。",
+  "source_policy": "TAIFEX official announcements and attachments. Includes temporary Lunar New Year uplift. Values are exchange-set standards, not FCM customer add-on margin.",
+  "records": [
+    {
+      "effective_date": "2024-07-29",
+      "announcement_date": "2024-06-25",
+      "initial": 12050,
+      "maintenance": 9250,
+      "settlement": 8900,
+      "source": "https://www.taifex.com.tw/file/taifex/CHINESE/11/attach/%E5%8F%B0%E6%9C%9F%E7%B5%90%E5%AD%97%E7%AC%AC1130301321%E8%99%9F.pdf",
+      "effective_rule": "上市日起適用"
+    },
+    {
+      "effective_date": "2024-08-09",
+      "announcement_date": "2024-08-08",
+      "initial": 13250,
+      "maintenance": 10150,
+      "settlement": 9800,
+      "source": "https://www.taifex.com.tw/file/taifex/CHINESE/11/attach/1130808%E4%BF%9D%E8%AD%89%E9%87%91%E8%AA%BF%E6%95%B4%E6%96%B0%E8%81%9E%E7%A8%BF(%E4%B8%AD%E6%96%87).pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2024-08-22",
+      "announcement_date": "2024-08-21",
+      "initial": 14600,
+      "maintenance": 11200,
+      "settlement": 10800,
+      "source": "https://www.taifex.com.tw/file/taifex/eng/eng11/20240821%E4%BF%9D%E8%AD%89%E9%87%91%E8%AA%BF%E6%95%B4%E6%96%B0%E8%81%9E%E7%A8%BFENG%281%29.pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2024-09-27",
+      "announcement_date": "2024-09-26",
+      "initial": 16100,
+      "maintenance": 12350,
+      "settlement": 11900,
+      "source": "https://www.taifex.com.tw/file/taifex/CHINESE/11/attach/1130926%E4%BF%9D%E8%AD%89%E9%87%91%E8%AA%BF%E6%95%B4%E5%85%AC%E5%91%8A.pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2024-10-31",
+      "announcement_date": "2024-10-30",
+      "initial": 16900,
+      "maintenance": 12950,
+      "settlement": 12500,
+      "source": "https://www.taifex.com.tw/file/taifex/CHINESE/11/attach/%E6%96%B0%E8%81%9E%E7%A8%BF_%E4%B8%AD%E6%96%87%285%29.pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2024-11-13",
+      "announcement_date": "2024-11-12",
+      "initial": 16100,
+      "maintenance": 12350,
+      "settlement": 11900,
+      "source": "https://www.taifex.com.tw/file/taifex/CHINESE/11/attach/1131112%E6%96%B0%E8%81%9E%E7%A8%BF.pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2025-01-22",
+      "announcement_date": "2025-01-21",
+      "initial": 17700,
+      "maintenance": 13600,
+      "settlement": 13100,
+      "source": "https://www.taifex.com.tw/file/taifex/eng/eng11/%E6%96%B0%E8%81%9E%E7%A8%BFENG%285%29.pdf",
+      "note": "春節長假臨時調高；2月6日期交所公告列出的調整前數值可交叉核對此筆",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2025-02-06",
+      "announcement_date": "2025-02-05",
+      "initial": 16100,
+      "maintenance": 12350,
+      "settlement": 11900,
+      "source": "https://www.taifex.com.tw/file/taifex/eng/eng11/%E6%96%B0%E8%81%9E%E7%A8%BFENG%285%29.pdf",
+      "note": "春節臨時調高後恢復至一般標準",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2025-03-25",
+      "announcement_date": "2025-03-24",
+      "initial": 15350,
+      "maintenance": 11750,
+      "settlement": 11350,
+      "source": "https://www.taifex.com.tw/cht/11/newsDetail?idx=15698&newsType=1",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2025-04-09",
+      "announcement_date": "2025-04-08",
+      "initial": 16900,
+      "maintenance": 12950,
+      "settlement": 12500,
+      "source": "https://www.taifex.com.tw/file/taifex/CHINESE/11/attach/1140408%E4%BF%9D%E8%AD%89%E9%87%91%E8%AA%BF%E6%95%B4%E5%85%AC%E5%91%8A.pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2025-04-16",
+      "announcement_date": "2025-04-15",
+      "initial": 17800,
+      "maintenance": 13650,
+      "settlement": 13150,
+      "source": "https://www.taifex.com.tw/file/taifex/CHINESE/11/attach/20250415%E4%BF%9D%E8%AD%89%E9%87%91%E8%AA%BF%E6%95%B4%E5%85%AC%E5%91%8A.pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2025-05-21",
+      "announcement_date": "2025-05-20",
+      "initial": 18700,
+      "maintenance": 14350,
+      "settlement": 13850,
+      "source": "https://www.taifex.com.tw/file/taifex/CHINESE/11/attach/%E6%96%B0%E8%81%9E%E7%A8%BF%2849%29.pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2025-06-16",
+      "announcement_date": "2025-06-13",
+      "initial": 17850,
+      "maintenance": 13700,
+      "settlement": 13200,
+      "source": "https://www.taifex.com.tw/file/taifex/CHINESE/11/attach/%E5%85%AC%E5%91%8A%E7%A8%BF%2813%29.pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2025-07-23",
+      "announcement_date": "2025-07-22",
+      "initial": 16950,
+      "maintenance": 13000,
+      "settlement": 12550,
+      "source": "https://www.taifex.com.tw/file/taifex/CHINESE/11/attach/0722%E4%BF%9D%E8%AD%89%E9%87%91%E8%AA%BF%E6%95%B4%E6%96%B0%E8%81%9E%E7%A8%BF.pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2025-08-07",
+      "announcement_date": "2025-08-06",
+      "initial": 15300,
+      "maintenance": 11700,
+      "settlement": 11300,
+      "source": "https://www.taifex.com.tw/file/taifex/CHINESE/11/attach/%E6%96%B0%E8%81%9E%E7%A8%BF_%E4%B8%80%E8%88%AC_%E8%82%A1%E7%A5%A8_20250806.pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2025-11-04",
+      "announcement_date": "2025-11-03",
+      "initial": 16900,
+      "maintenance": 12950,
+      "settlement": 12500,
+      "source": "https://www.taifex.com.tw/file/taifex/eng/eng11/%E6%96%B0%E8%81%9E%E7%A8%BF%E8%8B%B1%E6%96%8720251103.pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    },
+    {
+      "effective_date": "2025-12-31",
+      "announcement_date": "2025-12-30",
+      "initial": 17800,
+      "maintenance": 13650,
+      "settlement": 13150,
+      "source": "https://www.taifex.com.tw/chinese/11/attach/%E6%96%B0%E8%81%9E%E7%A8%BF_%E6%B8%85%E7%A8%BF.pdf",
+      "effective_rule": "一般交易時段結束後起適用"
+    }
+  ]
+}
