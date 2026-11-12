@@ -463,7 +463,7 @@ document.querySelector("header h1").insertAdjacentHTML("beforeend",' <span class
 const REPLAY_STATE_PREFIX="tmf.replay.state."+SIM_MODE+".v1.";
 const REPLAY_BACKUP_INDEX="tmf.replay.backups."+SIM_MODE+".v1";
 let replayStateReady=false, replayRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
-function replayStateKey(date,mode){return REPLAY_STATE_PREFIX+date+"."+mode;}
+function replayStateKey(date,mode,stamp){return REPLAY_STATE_PREFIX+date+"."+mode+"."+(stamp||new Date().toISOString().replace(/[:.]/g,"-"));}
 function replayStatePayload(){
  const key=replayStateKey(replayStartDate||$("session").value,replayStartMode||$("replayMode").value);
  return {schema:1,key,mode:SIM_MODE,session:replayStartDate||$("session").value,replayMode:replayStartMode||$("replayMode").value,
@@ -497,7 +497,8 @@ function saveReplayState(manual=false){
  }
 }
 function restoreReplayState(date,mode){
- const key=replayStateKey(date,mode);
+ const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]");
+ const key=arguments.length>2?arguments[2]:(index.find(x=>x.session===date&&x.replayMode===mode)?.key||replayStateKey(date,mode));
  try{
   const raw=localStorage.getItem(key);if(!raw)return false;
   const s=JSON.parse(raw);
@@ -580,7 +581,7 @@ applyManagedStop=function(){originalApplyStopForState();saveReplayState(false);}
 const originalApplyTargetForState=applyManagedTarget;
 applyManagedTarget=function(){originalApplyTargetForState();saveReplayState(false);};
 $("saveReplayNow").onclick=()=>{if(saveReplayState(true))alert("已安全保存，可以離開。");};
-$("restoreReplayBackup").onclick=()=>{const valid=listReplayBackups();if(valid.length){const latest=valid[0];if(confirm("找到 "+valid.length+" 個有效備份。要恢復最新版本（"+new Date(latest.savedAt).toLocaleString("zh-TW")+"）嗎？"))restoreReplayState(latest.session,latest.replayMode);}};
+$("restoreReplayBackup").onclick=()=>{const valid=listReplayBackups();if(valid.length){const latest=valid[0];if(confirm("找到 "+valid.length+" 個有效備份。要恢復最新版本（"+new Date(latest.savedAt).toLocaleString("zh-TW")+"）嗎？"))restoreReplayState(latest.session,latest.replayMode,latest.key);}};
 document.addEventListener("visibilitychange",()=>{if(document.hidden){stop();saveReplayState(false);}});
 window.addEventListener("pagehide",()=>{stop();saveReplayState(false);});
 window.addEventListener("beforeunload",()=>{stop();saveReplayState(false);});
