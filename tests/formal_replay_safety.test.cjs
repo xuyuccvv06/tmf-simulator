@@ -19,7 +19,7 @@ test('manual save, rolling versions, recovery selection and pause lifecycle are 
   assert.match(html, /id="saveReplayNow"/);
   assert.match(html, /id="restoreReplayBackup"/);
   assert.match(html, /REPLAY_BACKUP_INDEX/);
-  assert.match(html, /slice\(0,60\)/);
+  assert.match(html, /item\.session===snapshot\.session&&item\.replayMode===snapshot\.replayMode\?3:2/);
   assert.match(html, /old\.key\.startsWith\(REPLAY_STATE_PREFIX/);
   assert.match(html, /已安全保存，可以離開/);
   assert.match(html, /prompt\("選擇要恢復的有效備份/);
