@@ -10,7 +10,7 @@ test('replay snapshots are isolated by mode, dataset and replay session', () => 
   assert.match(html, /function replayStateKey\(date,mode,stamp\)/);
   assert.match(html, /function datasetAccountKey\(date,mode\)/);
   assert.match(html, /datasetId:replayDatasetId/);
-  assert.match(html, /s\.datasetId===replayDatasetId/);
+  assert.match(html, /s\.datasetId!==replayDatasetId/);
   assert.match(html, /s\.session!==date/);
   assert.match(html, /s\.checksum===replayChecksum\(s\)/);
 });
