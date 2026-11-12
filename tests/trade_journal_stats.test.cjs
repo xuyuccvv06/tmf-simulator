@@ -57,8 +57,12 @@ test("latest valid P&L correction is used; voiding it restores prior effective v
   const c1 = event("c1", "amendment", { target_entry_id: "exit1", recorded_at: "2026-11-11T03:01:00Z", context: { amendment_kind: "pnl_correction", corrected_realized_pnl_twd: -50 } });
   const c2 = event("c2", "amendment", { target_entry_id: "exit1", recorded_at: "2026-11-11T03:02:00Z", context: { amendment_kind: "pnl_correction", corrected_realized_pnl_twd: 250 } });
   const voidC2 = event("v2", "void", { target_entry_id: "c2" });
-  assert.equal(api.effectiveExitPnl(exit, [exit, c1, c2]), 250);
-  assert.equal(api.effectiveExitPnl(exit, [exit, c1, c2, voidC2]), -50);
+  const latest = api.effectiveExitPnl(exit, [exit, c1, c2]);
+  assert.equal(latest.p, 250);
+  assert.equal(latest.unit, "twd");
+  const restored = api.effectiveExitPnl(exit, [exit, c1, c2, voidC2]);
+  assert.equal(restored.p, -50);
+  assert.equal(restored.unit, "twd");
 });
 
 test("voiding a void marker restores the original event", () => {

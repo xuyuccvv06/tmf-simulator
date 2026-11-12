@@ -290,7 +290,7 @@ function decodeDataURL(url){const parts=url.split(","),mime=(parts[0].match(/dat
 $("exportData").onclick=async()=>{
  try{$("backupStatus").textContent="正在整理完整備份…";const datasets=await all("datasets"),stored=await all("attachments"),attachments=[];
  for(const a of stored)attachments.push({attachment_id:a.attachment_id,event_id:a.event_id,name:a.name,type:a.type,size:a.size,blob_data_url:await blobDataURL(a.blob)});const packedDatasets=[];for(const d of datasets){const bars=await getAllDatasetBars(d.meta);packedDatasets.push({meta:d.meta,bars});}
- const bundle={backup_format:"tmf-journal-full-v1",created_at:new Date().toISOString(),journal:db,datasets:packedDatasets,attachments,manifest:{event_count:db.events.length,dataset_count:packedDatasets.length,attachment_count:attachments.length,total_dataset_bars:packedDatasets.reduce((n,d)=>n+(d.bars?.length||0),0)}};
+ const accountState=JSON.parse(localStorage.getItem("tmf.sim.account.v1")||"null");const bundle={backup_format:"tmf-journal-full-v1",created_at:new Date().toISOString(),journal:db,account:accountState,datasets:packedDatasets,attachments,manifest:{event_count:db.events.length,dataset_count:packedDatasets.length,attachment_count:attachments.length,total_dataset_bars:packedDatasets.reduce((n,d)=>n+(d.bars?.length||0),0)}};
  const blob=new Blob([JSON.stringify(bundle)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="tmf-full-backup-"+new Date().toISOString().slice(0,10)+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
  $("backupStatus").textContent="完整備份已匯出：事件 "+db.events.length+" 筆、行情 "+datasets.length+" 份、附件 "+attachments.length+" 個。";
  }catch(err){$("backupStatus").textContent="備份失敗："+err.message;alert("備份失敗："+err.message);}
@@ -308,6 +308,10 @@ $("importFile").onchange=async e=>{
  try{
   const b=JSON.parse(await file.text());
   if(b.backup_format!=="tmf-journal-full-v1"||!b.journal||b.journal.version!==1||!Array.isArray(b.journal.events)||!Array.isArray(b.datasets)||!Array.isArray(b.attachments))throw Error("完整備份格式錯誤");
+  if(b.account!==undefined&&b.account!==null){
+   if(b.account.version!==1||!Number.isFinite(b.account.balance)||!Array.isArray(b.account.ledger)||!Number.isFinite(b.account.initial_margin_per_contract)||!Number.isFinite(b.account.maintenance_margin_per_contract)||b.account.initial_margin_per_contract<0||b.account.maintenance_margin_per_contract<0||(b.account.initial_margin_per_contract&&b.account.maintenance_margin_per_contract&&b.account.initial_margin_per_contract<b.account.maintenance_margin_per_contract))throw Error("模擬帳戶備份資料格式錯誤");
+   for(const item of b.account.ledger)if(!item||!["initial_capital","deposit","realized_pnl"].includes(item.type)||!Number.isFinite(item.amount)||typeof item.recorded_at!=="string"||!Number.isFinite(Date.parse(item.recorded_at)))throw Error("資金異動紀錄格式錯誤");
+  }
   const existingById=new Map(db.events.map(x=>[x.entry_id,x])),ids=new Set(existingById.keys()),incoming=b.journal.events,incomingIds=new Set();
   for(const ev of incoming){
    if(!ev||typeof ev.entry_id!=="string"||!labels[ev.event_type]||typeof ev.recorded_at!=="string"||!Number.isFinite(Date.parse(ev.recorded_at))||typeof ev.narrative!=="string"||!ev.narrative.trim())throw Error("備份內含格式錯誤的事件");
@@ -340,7 +344,7 @@ $("importFile").onchange=async e=>{
   localStorage.setItem(KEY,serialized);
   try{await atomicImport(packedForImport,chunksForImport,attachmentsToImport);}
   catch(storageError){try{if(previousJournal===null)localStorage.removeItem(KEY);else localStorage.setItem(KEY,previousJournal);}catch(rollbackError){throw Error("匯入失敗，且本機紀錄回復失敗；請勿關閉頁面，立即匯出目前資料。原始錯誤："+storageError.message+"；回復錯誤："+rollbackError.message);}throw storageError;}
-  db.events=merged;render();drawChart();await restoreDataset();
+  db.events=merged;if(b.account){localStorage.setItem("tmf.sim.account.v1",JSON.stringify(b.account));}render();drawChart();await restoreDataset();
   $("backupStatus").textContent="匯入完成：新增事件 "+additions.length+" 筆、行情 "+b.datasets.length+" 份、附件 "+b.attachments.length+" 個。";
  }catch(err){alert("匯入失敗："+err.message);$("backupStatus").textContent="匯入失敗："+err.message;}
  finally{e.target.value="";}
