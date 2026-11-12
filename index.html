@@ -189,7 +189,7 @@ function renderAccount(){
  renderCostSettings();
  const m=accountMetrics();$("accountBalance").textContent=money(account.balance);$("accountUnrealized").textContent=(m.u>0?"+":"")+money(m.u);$("accountEquity").textContent=money(m.equity);$("accountInitialUsed").textContent=money(m.initialUsed);$("accountMaintenance").textContent=money(m.maintenance);$("accountAvailable").textContent=money(m.available);
  $("accountUnrealized").style.color=m.u>0?"#f06468":m.u<0?"#20c887":"#edf4fa";
- let status="無持倉";if(!account.initial_margin_per_contract||!account.maintenance_margin_per_contract)status="尚未設定保證金參數；不進行追繳／強平判定";else if(position){if(marginLiquidationPending)status="保證金不足：已排定下一根 K 線開盤強制平倉";else if(m.equity<m.maintenance)status="低於維持保證金：即將強制平倉";else if(m.equity<m.initialUsed)status="低於原始保證金：保證金追繳警示";else status="保證金正常";}
+ let status="無持倉";if(!account.initial_margin_per_contract||!account.maintenance_margin_per_contract)status="尚未設定保證金參數；不進行追繳／強平判定";else if(position){if(marginLiquidationPending)status="保證金不足：已排定下一根 K 線開盤強制平倉";else if(m.equity<m.maintenance)status="低於維持保證金：已發出追繳通知";else if(m.equity<m.initialUsed)status="低於原始保證金：保證金追繳警示";else status="保證金正常";}
  $("marginStatus").textContent="保證金狀態："+status+"｜每口原始 "+money(account.initial_margin_per_contract)+"／維持 "+money(account.maintenance_margin_per_contract);
  if(document.activeElement!==$("initialMarginInput"))$("initialMarginInput").value=account.initial_margin_per_contract;if(document.activeElement!==$("maintenanceMarginInput"))$("maintenanceMarginInput").value=account.maintenance_margin_per_contract;
  const rows=account.ledger.slice(-5).reverse();$("accountLedger").innerHTML="<b>最近資金異動</b><br>"+(rows.length?rows.map(x=>{const label=x.type==="deposit"?"入金":x.type==="realized_pnl"?"交易結算":"初始資金";return label+"｜"+new Date(x.recorded_at).toLocaleString("zh-TW")+"｜"+(x.amount>=0?"+":"")+money(x.amount);}).join("<br>"):"尚無資金異動");
@@ -623,7 +623,7 @@ function renderMarginCall(){
  if(!marginCall||!position){el.textContent="目前沒有保證金追繳通知。";return;}
  const equity=accountMetrics().equity,required=account.initial_margin_per_contract*1,amount=Math.max(0,required-equity);
  const current=bars[Math.max(0,revealed-1)]?.t;
- const remain=current?Math.max(0,Date.parse(marginCall.deadline.replace(" ","T")+":00")-Date.parse(current.replace(" ","T")+"+08:00")):0;
+ const remain=current?Math.max(0,Date.parse(marginCall.deadline.replace(" ","T")+":00+08:00")-Date.parse(current.replace(" ","T")+"+08:00")):0;
  const hours=Math.floor(remain/3600000),minutes=Math.floor((remain%3600000)/60000);
  el.textContent="保證金追繳中｜補足至原始保證金尚需 "+money(amount)+"｜期限 "+marginCall.deadline+"｜模擬剩餘 "+hours+" 小時 "+minutes+" 分。期限前可追加資金或自行平倉；目前固定 1 口，無法做部分口數減倉。";
 }
@@ -637,7 +637,7 @@ function evaluateMarginCall(bar){
   else marginCall={triggeredAt:bar.t,deadline:null,tradingDate:bar.d};
  }
  if(marginCall&&m.equity>=m.initialUsed){marginCall=null;renderMarginCall();return;}
- if(marginCall&&marginCall.deadline&&bar.t>=marginCall.deadline.replace(" ","T")){
+ if(marginCall&&marginCall.deadline&&Date.parse(bar.t.replace(" ","T")+"+08:00")>=Date.parse(marginCall.deadline.replace(" ","T")+":00+08:00")){
   finishPosition(bar.o,bar.t,"保證金追繳期限屆滿強制平倉");
   marginCall=null;marginLiquidationPending=false;
  }
