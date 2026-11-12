@@ -5,20 +5,24 @@ const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
-test('replay snapshots are mode- and dataset-scoped and validate before restore', () => {
+test('replay snapshots are isolated by mode, dataset and replay session', () => {
   assert.match(html, /REPLAY_STATE_PREFIX="tmf\.replay\.state\."\+SIM_MODE/);
   assert.match(html, /function replayStateKey\(date,mode,stamp\)/);
-  assert.match(html, /function validateReplayState\(s\)/);
-  assert.match(html, /function restoreReplayState\(date,mode\)/);
-  assert.match(html, /s\.mode===SIM_MODE/);
+  assert.match(html, /function datasetAccountKey\(date,mode\)/);
+  assert.match(html, /datasetId:replayDatasetId/);
+  assert.match(html, /s\.datasetId===replayDatasetId/);
   assert.match(html, /s\.session!==date/);
+  assert.match(html, /s\.checksum===replayChecksum\(s\)/);
 });
 
-test('manual save, multiple backup index and page lifecycle pause are wired', () => {
+test('manual save, rolling versions, recovery selection and pause lifecycle are wired', () => {
   assert.match(html, /id="saveReplayNow"/);
   assert.match(html, /id="restoreReplayBackup"/);
-  assert.match(html, /REPLAY_BACKUP_INDEX/);\n  assert.match(html, /slice\\(0,60\\)/);\n  assert.match(html, /old\\.key\\.startsWith\\(REPLAY_STATE_PREFIX/);
+  assert.match(html, /REPLAY_BACKUP_INDEX/);
+  assert.match(html, /slice\(0,60\)/);
+  assert.match(html, /old\.key\.startsWith\(REPLAY_STATE_PREFIX/);
   assert.match(html, /已安全保存，可以離開/);
+  assert.match(html, /prompt\("選擇要恢復的有效備份/);
   assert.match(html, /document\.addEventListener\("visibilitychange"/);
   assert.match(html, /window\.addEventListener\("pagehide"/);
 });
@@ -30,15 +34,24 @@ test('limit entries only evaluate the next revealed bar and expire after a miss'
   assert.match(html, /type==="limitBuy"\|\|order\.type==="limitSell"/);
 });
 
-test('daily 4 percent loss and 12-loss streak block new entries and cancel entry orders', () => {
+test('daily 4 percent loss and 5/9/12 loss warnings enforce the entry gate', () => {
   assert.match(html, /dayStartEquity\)\*0\.04/);
+  assert.match(html, /replayRisk\.lossStreak>=5/);
+  assert.match(html, /replayRisk\.lossStreak>=9/);
   assert.match(html, /replayRisk\.lossStreak>=12/);
   assert.match(html, /replayRisk\.blockedDate=current\.d/);
   assert.match(html, /\["buy","sell","limitBuy","limitSell"\]\.includes\(pendingOrder\.type\)/);
   assert.match(html, /風控已封鎖今日新增進場/);
 });
 
-test('existing account and behaviour journal keys are not deleted or cleared by replay backup code', () => {
+test('formal mode cumulative stats use only revealed completed exits from the active dataset', () => {
+  assert.match(html, /formalPerformancePanel/);
+  assert.match(html, /replay_dataset_id:replayDatasetId/);
+  assert.match(html, /Date\.parse\(e\.market_timestamp\)<=cutoff/);
+  assert.match(html, /e\.context\?\.replay_dataset_id===replayDatasetId/);
+});
+
+test('existing account and behaviour journal keys are not deleted or cleared', () => {
   assert.doesNotMatch(html, /localStorage\.(removeItem|clear)\(/);
   assert.match(html, /tmf\.behaviourJournal\."\+SIM_MODE/);
   assert.match(html, /tmf\.sim\.account\."\+SIM_MODE/);
