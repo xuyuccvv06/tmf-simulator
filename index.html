@@ -500,6 +500,7 @@ document.querySelector("header h1").insertAdjacentHTML("beforeend",' <span class
 /* Durable replay state: additive keys only; never rewrite legacy trade journals. */
 const REPLAY_STATE_PREFIX="tmf.replay.state."+SIM_MODE+".v1.";
 const REPLAY_BACKUP_INDEX="tmf.replay.backups."+SIM_MODE+".v1";
+document.getElementById("formalPerformancePanel").style.display=SIM_MODE==="formal"?"block":"none";
 let replayDatasetId="unverified", replayStateReady=false, replayRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
 function replayStateKey(date,mode,stamp){return REPLAY_STATE_PREFIX+replayDatasetId+"."+date+"."+mode+"."+(stamp||new Date().toISOString().replace(/[:.]/g,"-"));}
 function replayChecksum(value){
