@@ -121,6 +121,13 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
  </div>
  <p class="note">淨損益已計入每邊手續費、雙邊期交稅及設定滑價。市價進出場與停損／強制平倉採不利滑價；停利視為限價單，觸價依停利價成交，跳空有利時依開盤價成交，不額外加不利滑價。一次只允許一筆持倉，不支援加碼或反手。</p>
 </section>
+<section class="panel" id="replaySafetyPanel">
+ <b>回放保存與風控狀態</b>
+ <div class="row" style="margin-top:8px"><button id="saveReplayNow" class="primary">立即保存</button><button id="restoreReplayBackup">檢查備份</button></div>
+ <p class="note" id="replaySaveStatus">尚未建立回放備份。</p>
+ <div class="stats"><div class="stat"><small>當日虧損上限</small><b>4%（當日初始權益）</b></div><div class="stat"><small>連續虧損提醒</small><b>5／9／12 次</b></div><div class="stat"><small>新增交易狀態</small><b id="riskGateStatus">正常</b></div></div>
+ <p class="note" id="riskStatus">風控紀錄會隨每根 K 線與交易事件保存。達到每日虧損或連續虧損上限時，禁止新增進場並取消未成交進場單；既有持倉與停損停利保留。</p>
+</section>
 <section class="panel">
  <b>選擇訓練場次</b>
  <div class="row" style="margin-top:10px">
@@ -405,6 +412,103 @@ $("modeSelector").value=SIM_MODE;
 $("modeSelector").onchange=()=>{if(position||pendingOrder){alert("請先平倉並取消待成交委託，再切換模式，避免持倉狀態遺失。");$("modeSelector").value=SIM_MODE;return;}location.href="./index.html?mode="+$("modeSelector").value;};
 $("replayNav").href="./index.html?mode="+SIM_MODE;$("journalNav").href="./trade_journal.html?mode="+SIM_MODE;
 document.querySelector("header h1").insertAdjacentHTML("beforeend",' <span class="tag">'+MODE_LABEL+'</span>');
+
+/* Durable replay state: additive keys only; never rewrite legacy trade journals. */
+const REPLAY_STATE_PREFIX="tmf.replay.state."+SIM_MODE+".v1.";
+const REPLAY_BACKUP_INDEX="tmf.replay.backups."+SIM_MODE+".v1";
+let replayStateReady=false, replayRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+function replayStateKey(date,mode){return REPLAY_STATE_PREFIX+date+"."+mode;}
+function replayStatePayload(){
+ const key=replayStateKey(replayStartDate||$("session").value,replayStartMode||$("replayMode").value);
+ return {schema:1,key,mode:SIM_MODE,session:replayStartDate||$("session").value,replayMode:replayStartMode||$("replayMode").value,
+  savedAt:new Date().toISOString(),revealed,selectedIndex,viewStart,position,pendingOrder,realizedPoints,lastTrade,
+  account,marginLiquidationPending,replayRisk};
+}
+function validateReplayState(s){
+ return !!s&&s.schema===1&&s.mode===SIM_MODE&&typeof s.session==="string"&&
+  Number.isInteger(s.revealed)&&s.revealed>=0&&s.revealed<=bars.length&&
+  Number.isInteger(s.selectedIndex)&&s.selectedIndex>=0&&
+  s.account&&Number.isFinite(s.account.balance)&&Array.isArray(s.account.ledger)&&
+  (s.position===null||(s.position&&["多","空"].includes(s.position.side)&&Number.isSafeInteger(s.position.entry)))&&
+  (s.pendingOrder===null||(s.pendingOrder&&typeof s.pendingOrder.type==="string"));
+}
+function saveReplayState(manual=false){
+ if(!replayStartDate||!bars.length)return false;
+ try{
+  const snapshot=replayStatePayload(),key=snapshot.key,raw=JSON.stringify(snapshot);
+  localStorage.setItem(key,raw);
+  const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]");
+  const entry={key,savedAt:snapshot.savedAt,bytes:raw.length,session:snapshot.session,replayMode:snapshot.replayMode};
+  index.unshift(entry);
+  const unique=index.filter((x,i,a)=>a.findIndex(y=>y.key===x.key&&y.savedAt===x.savedAt)===i).slice(0,60);
+  localStorage.setItem(REPLAY_BACKUP_INDEX,JSON.stringify(unique));
+  const status=$("replaySaveStatus");
+  if(status)status.textContent=(manual?"已安全保存，可以離開":"自動保存完成")+"｜"+new Date(snapshot.savedAt).toLocaleString("zh-TW")+"｜資料完整性檢查通過";
+  return true;
+ }catch(err){
+  const status=$("replaySaveStatus");if(status)status.textContent="保存失敗，請勿離開或關閉頁面："+err.message;
+  return false;
+ }
+}
+function restoreReplayState(date,mode){
+ const key=replayStateKey(date,mode);
+ try{
+  const raw=localStorage.getItem(key);if(!raw)return false;
+  const s=JSON.parse(raw);
+  if(!validateReplayState(s)||s.session!==date||s.replayMode!==mode)throw new Error("備份內容與目前資料集不一致");
+  revealed=s.revealed;selectedIndex=Math.min(s.selectedIndex,Math.max(0,revealed-1));
+  viewStart=Math.max(0,Math.min(s.viewStart,Math.max(0,revealed-1)));
+  position=s.position;pendingOrder=s.pendingOrder;realizedPoints=s.realizedPoints;
+  lastTrade=s.lastTrade;account=s.account;marginLiquidationPending=!!s.marginLiquidationPending;
+  replayRisk=s.replayRisk||replayRisk;
+  saveAccount();render();updateTradeUI();
+  $("replaySaveStatus").textContent="已恢復備份｜"+new Date(s.savedAt).toLocaleString("zh-TW")+"｜完整性檢查通過";
+  return true;
+ }catch(err){
+  $("replaySaveStatus").textContent="備份驗證失敗，原始資料未覆蓋："+err.message;
+  return false;
+ }
+}
+function listReplayBackups(){
+ try{
+  const rows=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]");
+  const valid=rows.filter(x=>{try{const s=JSON.parse(localStorage.getItem(x.key)||"null");return validateReplayState(s)&&s.savedAt===x.savedAt;}catch{return false;}});
+  $("replaySaveStatus").textContent="備份檢查完成："+valid.length+" 個有效版本／"+rows.length+" 個索引紀錄。最新："+(valid[0]?new Date(valid[0].savedAt).toLocaleString("zh-TW"):"無有效備份");
+  return valid;
+ }catch(err){$("replaySaveStatus").textContent="備份索引讀取失敗："+err.message;return [];}
+}
+const originalLoadDateForState=loadDate;
+loadDate=function(date){
+ if(replayStateReady)saveReplayState(false);
+ originalLoadDateForState(date);
+ replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+ const restored=restoreReplayState(date,$("replayMode").value);
+ replayStateReady=true;
+ if(!restored)saveReplayState(false);
+};
+const originalStepForState=step;
+step=function(){originalStepForState();saveReplayState(false);};
+const originalFinishForState=finishPosition;
+finishPosition=function(...args){
+ const priorBalance=account.balance;
+ originalFinishForState(...args);
+ const delta=account.balance-priorBalance;
+ if(delta<0)replayRisk.lossStreak=(replayRisk.lossStreak||0)+1;
+ else if(delta>0)replayRisk.lossStreak=0;
+ saveReplayState(false);
+};
+const originalDepositForState=depositFunds;
+depositFunds=function(){originalDepositForState();saveReplayState(false);};
+const originalApplyStopForState=applyManagedStop;
+applyManagedStop=function(){originalApplyStopForState();saveReplayState(false);};
+const originalApplyTargetForState=applyManagedTarget;
+applyManagedTarget=function(){originalApplyTargetForState();saveReplayState(false);};
+$("saveReplayNow").onclick=()=>{if(saveReplayState(true))alert("已安全保存，可以離開。");};
+$("restoreReplayBackup").onclick=()=>{const valid=listReplayBackups();if(valid.length){const latest=valid[0];if(confirm("找到 "+valid.length+" 個有效備份。要恢復最新版本（"+new Date(latest.savedAt).toLocaleString("zh-TW")+"）嗎？"))restoreReplayState(latest.session,latest.replayMode);}};
+document.addEventListener("visibilitychange",()=>{if(document.hidden){stop();saveReplayState(false);}});
+window.addEventListener("pagehide",()=>{stop();saveReplayState(false);});
+window.addEventListener("beforeunload",()=>{stop();saveReplayState(false);});
+
 loadHistoricalMarginData();
 init();
 </script>
