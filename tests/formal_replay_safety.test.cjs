@@ -72,6 +72,11 @@ test('daily profit giveback is tracked for reporting but does not block new trad
   assert.doesNotMatch(html, /if\(replayRisk\.(profitGiveback|maxProfitGiveback)/);
 });
 
+test('broker-specific intraday risk liquidation is not guessed without a confirmed broker contract', () => {
+  assert.match(html, /盤中風險指標強制平倉門檻尚未設定期貨商契約/);
+  assert.match(html, /不套用任意 25% 假設/);
+});
+
 test('margin calls persist to the next trading-day noon and are included in snapshots', () => {
   assert.match(html, /function evaluateMarginCall\(bar\)/);
   assert.match(html, /dates\.find\(d=>d>bar\.d\)/);
