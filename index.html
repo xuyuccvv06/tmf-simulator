@@ -298,6 +298,7 @@ function recordFormalDecision(eventType,details={}){
  const key=formalDecisionKey();let log;
  try{log=JSON.parse(localStorage.getItem(key)||"null");}catch{log=null;}
  if(!log)log={schema:1,datasetId:replayDatasetId,events:[],sealed:false};
+ if(log.schema!==1||log.datasetId!==replayDatasetId||!Array.isArray(log.events)||(log.checksum&&log.checksum!==formalDecisionChecksum(log.events)))throw new Error("正式決策紀錄完整性驗證失敗，已停止寫入以保護原始紀錄。");
  if(log.sealed)return;
  const last=revealed?bars[revealed-1]:null;
  log.events.push({id:"fd_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,8),eventType,
@@ -311,6 +312,7 @@ function sealFormalDecisionLog(){
  const key=formalDecisionKey();let log;
  try{log=JSON.parse(localStorage.getItem(key)||"null");}catch{log=null;}
  if(!log)log={schema:1,datasetId:replayDatasetId,events:[],sealed:false};
+ if(log.schema!==1||log.datasetId!==replayDatasetId||!Array.isArray(log.events)||(log.checksum&&log.checksum!==formalDecisionChecksum(log.events)))throw new Error("正式決策紀錄驗證失敗，無法封存。");
  if(log.sealed)return;
  log.sealed=true;log.sealedAt=new Date().toISOString();log.checksum=formalDecisionChecksum(log.events);
  localStorage.setItem(key,JSON.stringify(log));
