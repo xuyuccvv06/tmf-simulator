@@ -1031,7 +1031,7 @@ $("exportReplayBackups").onclick=()=>{
  const url=URL.createObjectURL(blob),a=document.createElement("a");
  a.href=url;a.download="tmf-replay-backup-"+replayDatasetId+"-"+replayStartDate+".json";
  document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
- $("replaySaveStatus").textContent="備份檔已匯出："+backups.length+" 個有效版本。可另存至 iCloud Drive 或其他雲端空間。";
+ $("replaySaveStatus").textContent="備份檔已匯出："+backups.length+" 個有效回放版本及正式決策紀錄（若有），涵蓋此資料集的各個回放場次。可另存至 iCloud Drive 或其他雲端空間。";
 };
 $("importReplayBackups").onclick=()=>$("replayBackupFile").click();
 $("replayBackupFile").onchange=async()=>{
@@ -1070,7 +1070,7 @@ $("replayBackupFile").onchange=async()=>{
   if(!added.length&&!decisionLogImported)throw new Error("檔案內沒有可通過完整性驗證且可匯入的備份或決策紀錄。");
   const merged=[...added,...index].filter((x,i,a)=>a.findIndex(y=>y.key===x.key&&y.savedAt===x.savedAt)===i).slice(0,60);
   localStorage.setItem(REPLAY_BACKUP_INDEX,JSON.stringify(merged));
-  if(payload.formalRunLock&&SIM_MODE==="formal"&&!formalRunLock&&payload.formalRunLock.datasetId===replayDatasetId&&payload.formalRunLock.startDate==="2024-07-29"&&["day","night"].includes(payload.formalRunLock.replayMode)){
+  if(payload.formalRunLock&&SIM_MODE==="formal"&&!formalRunLock&&payload.formalRunLock.datasetId===replayDatasetId&&payload.formalRunLock.startDate===replayStartDate&&payload.formalRunLock.replayMode===replayStartMode){
    formalRunLock=payload.formalRunLock;account.costs={...formalRunLock.costs};saveAccount();localStorage.setItem(formalLockStorageKey(),JSON.stringify(formalRunLock));applyFormalLockUI();
   }
   $("replaySaveStatus").textContent="已匯入 "+added.length+" 個有效備份版本"+(decisionLogImported?"及正式決策紀錄":"")+"；既有有效資料未覆蓋。";
