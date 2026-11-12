@@ -252,11 +252,11 @@ async function saveReplayDatasetToJournalDB(rawText,sourceBars){
   const datasetId="ds_"+hash.slice(0,16),bars=sourceBars.map(x=>({timestamp:new Date(x.t.replace(" ","T")+"+08:00").toISOString(),market_timestamp:x.t,trading_date:x.d,open:x.o,high:x.h,low:x.l,close:x.c,volume:x.v}));
   const chunkSize=5000,chunks=[],descriptors=[];
   for(let i=0;i<bars.length;i+=chunkSize){
-   const part=bars.slice(i,i+chunkSize),chunkIndex=descriptors.length,chunkId=datasetId+"_"+String(chunkIndex).padStart(6,"0");
+   const part=bars.slice(i,i+chunkSize),chunkIndex=descriptors.length,chunkId=datasetId+"_v2_"+String(chunkIndex).padStart(6,"0");
    descriptors.push({chunk_id:chunkId,first_timestamp:part[0].timestamp,last_timestamp:part[part.length-1].timestamp,row_count:part.length});
    chunks.push({chunk_id:chunkId,dataset_id:datasetId,chunk_index:chunkIndex,bars:part});
   }
-  const meta={dataset_id:datasetId,dataset_sha256:hash,product_id:"TMFR1",timeframe:"5 分鐘",row_count:bars.length,first_timestamp:bars[0].timestamp,last_timestamp:bars[bars.length-1].timestamp,chunks:descriptors};
+  const meta={schema_version:2,dataset_id:datasetId,dataset_sha256:hash,product_id:"TMFR1",timeframe:"5 分鐘",row_count:bars.length,first_timestamp:bars[0].timestamp,last_timestamp:bars[bars.length-1].timestamp,chunks:descriptors};
   await new Promise((resolve,reject)=>{
    const tx=journalDB.transaction(["datasets","dataset_chunks"],"readwrite");
    tx.objectStore("datasets").put({dataset_id:datasetId,meta});
@@ -288,8 +288,10 @@ async function loadReplayDatasetFromJournalDB(datasetId){
    tx.oncomplete=()=>resolve({meta:metaReq.result?.meta,chunks:chunksReq.result||[]});
    tx.onerror=()=>reject(tx.error||new Error("資料集讀取失敗"));
   });
-  if(!result.meta||!result.chunks.length)throw new Error("找不到此資料集的完整備份。");
-  const bars=result.chunks.sort((a,b)=>a.chunk_index-b.chunk_index).flatMap(x=>x.bars||[]).map(x=>{
+  if(!result.meta||result.meta.schema_version!==2)throw new Error("此資料集尚未建立可切換的新版備份，請重新匯入原始 CSV。");
+  const currentChunks=result.chunks.filter(x=>x.chunk_id.startsWith(datasetId+"_v2_"));
+  if(!currentChunks.length)throw new Error("找不到此資料集的完整備份。");
+  const bars=currentChunks.sort((a,b)=>a.chunk_index-b.chunk_index).flatMap(x=>x.bars||[]).map(x=>{
    if(!x.market_timestamp||!x.trading_date)throw new Error("此舊版資料集缺少交易時間／交易日欄位，請重新匯入原始 CSV。");
    return {t:x.market_timestamp,d:x.trading_date,o:x.open,h:x.high,l:x.low,c:x.close,v:x.volume};
   });
