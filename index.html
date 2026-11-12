@@ -65,6 +65,18 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
   <label for="visible">顯示根數</label><select id="visible"><option>30</option><option>50</option><option>80</option><option>120</option></select>
  </div>
 </section>
+<section class="panel" id="accountPanel">
+ <div class="row" style="justify-content:space-between"><b>模擬帳戶／保證金</b><span class="tag">TMF · 10 元／點</span></div>
+ <div class="stats" style="margin-top:10px">
+  <div class="stat"><small>帳戶餘額</small><b id="accountBalance">—</b></div><div class="stat"><small>未實現損益</small><b id="accountUnrealized">—</b></div><div class="stat"><small>帳戶權益</small><b id="accountEquity">—</b></div>
+  <div class="stat"><small>原始保證金占用</small><b id="accountInitialUsed">—</b></div><div class="stat"><small>維持保證金需求</small><b id="accountMaintenance">—</b></div><div class="stat"><small>可用資金</small><b id="accountAvailable">—</b></div>
+ </div>
+ <p class="note" id="marginStatus" style="margin-top:9px">保證金狀態：—</p>
+ <div class="trade-record"><div><label for="depositAmount">追加資金（新臺幣）</label><input id="depositAmount" type="number" min="1" step="1" inputmode="numeric" placeholder="輸入入金金額"></div><div style="display:flex;align-items:end"><button id="depositButton" class="primary">確認入金</button></div></div>
+ <div class="trade-record"><div><label for="initialMarginInput">每口原始保證金（元）</label><input id="initialMarginInput" type="number" min="1" step="1" inputmode="numeric"></div><div><label for="maintenanceMarginInput">每口維持保證金（元）</label><input id="maintenanceMarginInput" type="number" min="1" step="1" inputmode="numeric"></div><div class="full"><button id="saveMarginSettings">儲存保證金參數</button></div></div>
+ <div class="note" id="accountLedger" style="margin-top:9px">資金異動紀錄載入中…</div>
+ <p class="note">初始資金 NT$50,000。入金與已實現損益會累計至帳戶餘額，切換回放日期不會重置帳戶。保證金預設採期交所目前可查公告值；歷史日期對應的保證金表尚待串接。此階段損益尚未扣手續費、期交稅及滑價，後續成本模組完成前請勿視為淨損益。</p>
+</section>
 <section class="panel">
  <b>模擬交易（市價單）</b>
  <div class="stats" style="margin-top:10px">
@@ -126,6 +138,30 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
 <script>
 let all=[], dates=[], bars=[], revealed=0, timer=null, viewStart=0, selectedIndex=0, replayStartDate=null, replayStartMode='night';
 let position=null, pendingOrder=null, realizedPoints=0, lastTrade=null;
+const ACCOUNT_KEY="tmf.sim.account.v1";
+function loadAccount(){
+ try{const x=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||"null");if(x&&x.version===1&&Number.isFinite(x.balance)&&Array.isArray(x.ledger))return x;}catch(e){}
+ const initial={version:1,balance:50000,initial_margin_per_contract:31800,maintenance_margin_per_contract:24400,ledger:[{type:"initial_capital",amount:50000,recorded_at:new Date().toISOString(),note:"模擬帳戶初始資金"}]};
+ localStorage.setItem(ACCOUNT_KEY,JSON.stringify(initial));return initial;
+}
+let account=loadAccount(),marginLiquidationPending=false;
+const money=n=>"NT$"+Math.round(n).toLocaleString("zh-TW");
+function saveAccount(){localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}
+function accountUnrealized(){const last=revealed?bars[revealed-1]:null;return position&&last?(last.c-position.entry)*(position.side==="多"?1:-1)*10:0;}
+function accountMetrics(){const qty=position?1:0,u=accountUnrealized(),equity=account.balance+u;return {qty,u,equity,initialUsed:account.initial_margin_per_contract*qty,maintenance:account.maintenance_margin_per_contract*qty,available:equity-account.initial_margin_per_contract*qty};}
+function renderAccount(){
+ const m=accountMetrics();$("accountBalance").textContent=money(account.balance);$("accountUnrealized").textContent=(m.u>0?"+":"")+money(m.u);$("accountEquity").textContent=money(m.equity);$("accountInitialUsed").textContent=money(m.initialUsed);$("accountMaintenance").textContent=money(m.maintenance);$("accountAvailable").textContent=money(m.available);
+ $("accountUnrealized").style.color=m.u>0?"#f06468":m.u<0?"#20c887":"#edf4fa";
+ let status="無持倉";if(position){if(marginLiquidationPending)status="保證金不足：已排定下一根 K 線開盤強制平倉";else if(m.equity<m.maintenance)status="低於維持保證金：即將強制平倉";else if(m.equity<m.initialUsed)status="低於原始保證金：保證金追繳警示";else status="保證金正常";}
+ $("marginStatus").textContent="保證金狀態："+status+"｜每口原始 "+money(account.initial_margin_per_contract)+"／維持 "+money(account.maintenance_margin_per_contract);
+ if(document.activeElement!==$("initialMarginInput"))$("initialMarginInput").value=account.initial_margin_per_contract;if(document.activeElement!==$("maintenanceMarginInput"))$("maintenanceMarginInput").value=account.maintenance_margin_per_contract;
+ const rows=account.ledger.slice(-5).reverse();$("accountLedger").innerHTML="<b>最近資金異動</b><br>"+(rows.length?rows.map(x=>{const label=x.type==="deposit"?"入金":x.type==="realized_pnl"?"交易結算":"初始資金";return label+"｜"+new Date(x.recorded_at).toLocaleString("zh-TW")+"｜"+(x.amount>=0?"+":"")+money(x.amount);}).join("<br>"):"尚無資金異動");
+}
+function addAccountLedger(type,amount,note){account.ledger.push({type,amount,recorded_at:new Date().toISOString(),note:note||""});saveAccount();}
+function depositFunds(){const raw=$("depositAmount").value.trim(),amount=Number(raw);if(!raw||!Number.isSafeInteger(amount)||amount<=0){$("marginStatus").textContent="入金失敗：請輸入大於 0 的整數金額。";return;}account.balance+=amount;addAccountLedger("deposit",amount,"使用者手動追加資金");$("depositAmount").value="";renderAccount();$("marginStatus").textContent="入金成功："+money(amount)+"；已計入帳戶餘額。";}
+function saveMarginSettings(){const initial=Number($("initialMarginInput").value),maintenance=Number($("maintenanceMarginInput").value);if(!Number.isSafeInteger(initial)||!Number.isSafeInteger(maintenance)||initial<=0||maintenance<=0||initial<maintenance){$("marginStatus").textContent="保證金參數無效：原始保證金與維持保證金須為正整數，且原始不得低於維持。";return;}account.initial_margin_per_contract=initial;account.maintenance_margin_per_contract=maintenance;saveAccount();renderAccount();$("marginStatus").textContent="保證金參數已保存。";}
+function checkMargin(){if(!position||marginLiquidationPending)return;const m=accountMetrics();if(m.equity<m.maintenance){marginLiquidationPending=true;$("orderStatus").textContent="帳戶權益低於維持保證金，已排定下一根 K 線開盤強制平倉。";renderAccount();}}
+
 const $=id=>document.getElementById(id);
 function setStatus(s){$('status').textContent=s}
 async function saveReplayDatasetToJournalDB(rawText,sourceBars){
@@ -159,14 +195,14 @@ function parseCSV(text){
  return lines.map(line=>{const c=line.split(',');return {t:c[ix.datetime],d:c[ix.trading_date],o:+c[ix.open],h:+c[ix.high],l:+c[ix.low],c:+c[ix.close],v:+c[ix.volume]};})
  .filter(x=>x.t&&x.d&&[x.o,x.h,x.l,x.c].every(Number.isFinite));
 }
-function loadDate(d){const mode=$('replayMode').value;if((position||pendingOrder)&&(replayStartDate!==d||replayStartMode!==mode)){const ok=confirm("目前仍有持倉或待成交委託。切換回放日期或起點模式會重置目前模擬狀態，確定要切換嗎？");if(!ok){$('session').value=replayStartDate||d;$('replayMode').value=replayStartMode;return}}stop();let startIndex=-1;if(mode==='night'){startIndex=all.findIndex(x=>x.d===d&&x.t.slice(11,16)>='15:00');}if(startIndex<0){startIndex=all.findIndex(x=>x.t.slice(0,10)===d&&x.t.slice(11,16)>='08:45'&&x.t.slice(11,16)<='13:45');}if(startIndex<0)startIndex=all.findIndex(x=>x.t.slice(0,10)===d);bars=startIndex<0?[]:all.slice(startIndex);replayStartDate=d;replayStartMode=mode;revealed=Math.min(1,bars.length);viewStart=0;selectedIndex=Math.max(0,revealed-1);position=null;pendingOrder=null;realizedPoints=0;lastTrade=null;updateTradeUI();$('date').textContent=d;render();const first=bars[0];setStatus(`連續回放中・${mode==='night'?'前一夜盤起點':'日盤起點'}・所選日期 ${d}・實際起點 ${first?first.t:'無資料'}・後續 ${bars.length.toLocaleString()} 根（跨日期／盤別接續）`)}
+function loadDate(d){const mode=$('replayMode').value;if((position||pendingOrder)&&(replayStartDate!==d||replayStartMode!==mode)){const ok=confirm("目前仍有持倉或待成交委託。切換回放日期或起點模式會重置目前模擬狀態，確定要切換嗎？");if(!ok){$('session').value=replayStartDate||d;$('replayMode').value=replayStartMode;return}}stop();let startIndex=-1;if(mode==='night'){startIndex=all.findIndex(x=>x.d===d&&x.t.slice(11,16)>='15:00');}if(startIndex<0){startIndex=all.findIndex(x=>x.t.slice(0,10)===d&&x.t.slice(11,16)>='08:45'&&x.t.slice(11,16)<='13:45');}if(startIndex<0)startIndex=all.findIndex(x=>x.t.slice(0,10)===d);bars=startIndex<0?[]:all.slice(startIndex);replayStartDate=d;replayStartMode=mode;revealed=Math.min(1,bars.length);viewStart=0;selectedIndex=Math.max(0,revealed-1);position=null;pendingOrder=null;realizedPoints=0;lastTrade=null;marginLiquidationPending=false;updateTradeUI();$('date').textContent=d;render();const first=bars[0];setStatus(`連續回放中・${mode==='night'?'前一夜盤起點':'日盤起點'}・所選日期 ${d}・實際起點 ${first?first.t:'無資料'}・後續 ${bars.length.toLocaleString()} 根（跨日期／盤別接續）`)}
 function render(){const shown=bars.slice(0,revealed),last=shown.at(-1);$('count').textContent=`${revealed} / ${bars.length}`;$('price').textContent=last?last.c.toLocaleString('en-US'):'—';const n=Math.min(+$('visible').value,shown.length);viewStart=Math.max(0,Math.min(viewStart,shown.length-n));selectedIndex=Math.max(0,Math.min(selectedIndex,shown.length-1));$('barCursor').max=Math.max(0,shown.length-1);$('barCursor').value=selectedIndex;updateSelectedBar();draw(shown);$('step').disabled=revealed>=bars.length}
 function updateSelectedBar(){const x=bars[selectedIndex];if(!x)return;$('selectedTime').textContent=x.t.replace('T',' ');$('selectedOpen').textContent=x.o.toLocaleString('en-US');$('selectedHigh').textContent=x.h.toLocaleString('en-US');$('selectedLow').textContent=x.l.toLocaleString('en-US');$('selectedClose').textContent=x.c.toLocaleString('en-US')}
 function draw(data){const cv=$('chart'),ctx=cv.getContext('2d'),w=cv.width,h=cv.height;ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b131c';ctx.fillRect(0,0,w,h);if(!data.length)return;const n=Math.min(+$('visible').value,data.length),maxStart=Math.max(0,data.length-n);viewStart=Math.max(0,Math.min(viewStart,maxStart));const a=data.slice(viewStart,viewStart+n);let lo=Math.min(...a.map(x=>x.l)),hi=Math.max(...a.map(x=>x.h)),pad=(hi-lo)*.09||10;lo-=pad;hi+=pad;const left=58,right=12,top=18,bottom=28,ph=h-top-bottom,pw=w-left-right;ctx.font='12px sans-serif';ctx.strokeStyle='#263545';ctx.fillStyle='#9aabba';for(let j=0;j<=4;j++){let y=top+ph*j/4;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();ctx.fillText((hi-(hi-lo)*j/4).toFixed(0),5,y+4)}const yv=p=>top+(hi-p)/(hi-lo)*ph,step=pw/a.length,body=Math.max(3,step*.58);a.forEach((x,i)=>{let xx=left+i*step+step/2,up=x.c>=x.o,col=up?'#f06468':'#20c887';ctx.strokeStyle=col;ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(xx,yv(x.h));ctx.lineTo(xx,yv(x.l));ctx.stroke();let y=Math.min(yv(x.o),yv(x.c)),bh=Math.max(2,Math.abs(yv(x.o)-yv(x.c)));ctx.fillRect(xx-body/2,y,body,bh)});
  const selectedLocal=selectedIndex-viewStart;
  if(selectedLocal>=0&&selectedLocal<a.length){const sx=left+selectedLocal*step+step/2,sy=yv(a[selectedLocal].c);ctx.save();ctx.strokeStyle='#f5c451';ctx.lineWidth=1.5;ctx.setLineDash([6,5]);ctx.beginPath();ctx.moveTo(sx,top);ctx.lineTo(sx,top+ph);ctx.moveTo(left,sy);ctx.lineTo(w-right,sy);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#f5c451';ctx.beginPath();ctx.arc(sx,sy,4,0,Math.PI*2);ctx.fill();ctx.restore()}
  ctx.fillStyle='#9aabba';ctx.fillText(a[0].t.slice(11,16),left,h-7);ctx.fillText(a[a.length-1].t.slice(11,16),w-62,h-7)}
-function step(){if(revealed<bars.length){const n=Math.min(+$('visible').value,revealed),wasAtLatest=viewStart>=Math.max(0,revealed-n),cursorWasLatest=selectedIndex===revealed-1;const nextBar=bars[revealed];revealed++;if(pendingOrder)executePending(nextBar);if(position)evaluateStops(nextBar);if(wasAtLatest)viewStart=Math.max(0,revealed-Math.min(+$('visible').value,revealed));if(cursorWasLatest)selectedIndex=revealed-1;render();updateTradeUI()}if(revealed>=bars.length){stop();setStatus(position?'已到資料集最後一根 K 線；未平倉部位保留，沒有後續行情可供撮合。':'連續回放已到資料集最後一根 K 線。');if(pendingOrder){$('orderStatus').textContent='資料集已結束，未成交委託已取消；未平倉部位不受影響。';pendingOrder=null;updateTradeUI()}}}
+function step(){if(revealed<bars.length){const n=Math.min(+$('visible').value,revealed),wasAtLatest=viewStart>=Math.max(0,revealed-n),cursorWasLatest=selectedIndex===revealed-1;const nextBar=bars[revealed];revealed++;if(marginLiquidationPending&&position){finishPosition(nextBar.o,nextBar.t,'保證金不足強制平倉');marginLiquidationPending=false;}if(pendingOrder)executePending(nextBar);if(position)evaluateStops(nextBar);if(position)checkMargin();if(wasAtLatest)viewStart=Math.max(0,revealed-Math.min(+$('visible').value,revealed));if(cursorWasLatest)selectedIndex=revealed-1;render();updateTradeUI()}if(revealed>=bars.length){stop();setStatus(position?'已到資料集最後一根 K 線；未平倉部位保留，沒有後續行情可供撮合。':'連續回放已到資料集最後一根 K 線。');if(pendingOrder){$('orderStatus').textContent='資料集已結束，未成交委託已取消；未平倉部位不受影響。';pendingOrder=null;updateTradeUI()}}}
 function readDistance(id){
  const raw=$(id).value.trim();
  if(!raw)return null;
@@ -220,6 +256,7 @@ function finishPosition(fill,time,reason){
  if(!position)return;
  const closed=position,pts=(fill-closed.entry)*(closed.side==='多'?1:-1);
  realizedPoints+=pts;
+ const realizedTwd=pts*10;account.balance+=realizedTwd;addAccountLedger('realized_pnl',realizedTwd,'模擬交易已實現損益（未扣交易成本）');
  lastTrade={side:closed.side,entryTime:closed.entryTime,entry:closed.entry,exitTime:time,exit:fill,points:pts,exitReason:reason};
  try{saveSimulationTrade(closed,fill,time,reason,pts);}
  catch(err){$('orderStatus').textContent+='｜交易歷史保存失敗：'+err.message;}
@@ -243,6 +280,7 @@ function placeMarketOrder(type){
  if(revealed>=bars.length){$('orderStatus').textContent='本局已結束，無法送單。';return}
  if(type==='close'&&!position){return}
  if((type==='buy'||type==='sell')&&position){$('orderStatus').textContent='目前已有持倉，請先平倉後再進場。';return}
+ if((type==='buy'||type==='sell')&&account.balance<account.initial_margin_per_contract){$('orderStatus').textContent='帳戶餘額不足原始保證金，無法建立新倉。';return}
  try{
   const stopDistance=(type==='buy'||type==='sell')?readDistance('stopLossPoints'):null;
   const targetDistance=(type==='buy'||type==='sell')?readDistance('takeProfitPoints'):null;
@@ -295,6 +333,7 @@ function updateTradeUI(){
  $('recordPoints').textContent=lastTrade?`${lastTrade.points>=0?'+':''}${lastTrade.points.toFixed(1)} 點（${lastTrade.side}）`:'尚無已完成交易';
  $('recordPoints').style.color=lastTrade?(lastTrade.points>0?'#20c887':lastTrade.points<0?'#f06468':'#edf4fa'):'#edf4fa';
  $('recordExitReason').textContent=lastTrade?lastTrade.exitReason:'—';
+ renderAccount();
 }
 
 function stop(){if(timer)clearInterval(timer);timer=null;$('play').textContent='▶ 播放'}function play(){if(timer){stop();return}if(revealed>=bars.length)return;$('play').textContent='Ⅱ 暫停';timer=setInterval(step,+$('speed').value)}
@@ -308,6 +347,7 @@ $('cursorLatest').onclick=()=>{selectedIndex=Math.max(0,revealed-1);$('barCursor
 $('buy').onclick=()=>placeMarketOrder('buy');$('sell').onclick=()=>placeMarketOrder('sell');$('close').onclick=()=>placeMarketOrder('close');
 $('step').onclick=step;$('play').onclick=play;$('applyStop').onclick=applyManagedStop;$('applyTarget').onclick=applyManagedTarget;$('reset').onclick=()=>loadDate($('session').value);$('speed').onchange=()=>{if(timer){stop();play()}};$('visible').onchange=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);if(selectedIndex<viewStart)selectedIndex=viewStart;render()};$('latest').onclick=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);render()};$('session').onchange=()=>loadDate($('session').value);$('replayMode').onchange=()=>loadDate($('session').value);$('newSession').onclick=()=>{const d=dates[Math.floor(Math.random()*dates.length)];$('session').value=d;loadDate(d)};
 async function init(){try{setStatus('正在載入 CSV…');const res=await fetch('./TMFR1_5min_2024-2025.csv');if(!res.ok)throw new Error(`CSV 載入失敗：HTTP ${res.status}`);const rawCsv=await res.text();all=parseCSV(rawCsv);if(!all.length)throw new Error('CSV 沒有可用行情');all.sort((a,b)=>a.t.localeCompare(b.t));let backupSync='';try{const saved=await saveReplayDatasetToJournalDB(rawCsv,all);backupSync=`・完整行情已同步備份（${saved.rowCount.toLocaleString()} 根）`;}catch(syncError){backupSync='・行情備份同步失敗：'+syncError.message;}dates=[...new Set(all.filter(x=>x.t.slice(11,16)>='08:45'&&x.t.slice(11,16)<='13:45').map(x=>x.t.slice(0,10)))].sort();dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;$('session').appendChild(o)});$('session').value=dates[0];loadDate(dates[0]);setStatus(`資料載入完成・${all.length.toLocaleString()} 根${backupSync}`)}catch(e){setStatus('載入失敗');const msg=document.createElement('p');msg.className='note';msg.style.color='#f06468';msg.textContent=e.message+'。請確認 CSV 與 HTML 位於同一個 GitHub Repository 根目錄，並透過 GitHub Pages 網址開啟。';document.querySelector('main').prepend(msg)}}
+$("depositButton").onclick=depositFunds;$("saveMarginSettings").onclick=saveMarginSettings;
 init();
 </script>
 </body></html>
