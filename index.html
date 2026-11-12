@@ -577,7 +577,7 @@ function validateReplayCsvBars(sourceBars){
  if(!Array.isArray(sourceBars)||!sourceBars.length)throw new Error("CSV 沒有可用行情。");
  const seen=new Set();
  for(const b of sourceBars){
-  if(!b.t||!/^\d{4}-\d{2}-\d{2}$/.test(b.d)||![b.o,b.h,b.l,b.c,b.v].every(Number.isFinite))throw new Error("CSV 含有無效時間、交易日或 OHLCV 欄位。");
+  if(!b.t||!Number.isFinite(Date.parse(b.t.replace(" ","T")+"+08:00"))||!/^\d{4}-\d{2}-\d{2}$/.test(b.d)||![b.o,b.h,b.l,b.c,b.v].every(Number.isFinite))throw new Error("CSV 含有無效時間、交易日或 OHLCV 欄位。");
   if(b.h<Math.max(b.o,b.c)||b.l>Math.min(b.o,b.c)||b.h<b.l||b.v<0)throw new Error("CSV 含有不合理的 K 線高低價或成交量。");
   if(seen.has(b.t))throw new Error("CSV 有重複的 K 線時間："+b.t);
   seen.add(b.t);
@@ -634,7 +634,7 @@ async function importReplayDatasetFile(){
  const file=$("datasetUploadFile").files?.[0];if(!file)return;
  try{
   $("datasetStatus").textContent="正在驗證並保存 CSV…";
-  const raw=await file.text(),parsed=validateReplayCsvBars(parseCSV(raw));
+  const raw=await file.text(),parsedRows=parseCSV(raw),expectedRows=Math.max(0,raw.trim().split(/\r?\n/).length-1);if(parsedRows.length!==expectedRows)throw new Error("CSV 有缺漏或格式錯誤的資料列，已拒絕部分載入。");const parsed=validateReplayCsvBars(parsedRows);
   const datesForFile=buildReplayDates(parsed);
   if(!datesForFile.length)throw new Error("CSV 缺少可用的 08:45–13:45 日盤日期。");
   const saved=await saveReplayDatasetToJournalDB(raw,parsed);
