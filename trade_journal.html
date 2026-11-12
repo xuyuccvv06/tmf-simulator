@@ -309,7 +309,7 @@ $("importFile").onchange=async e=>{
   const b=JSON.parse(await file.text());
   if(b.backup_format!=="tmf-journal-full-v1"||!b.journal||b.journal.version!==1||!Array.isArray(b.journal.events)||!Array.isArray(b.datasets)||!Array.isArray(b.attachments))throw Error("完整備份格式錯誤");
   if(b.account!==undefined&&b.account!==null){
-   if(b.account.version!==1||!Number.isFinite(b.account.balance)||b.account.balance<0||!Array.isArray(b.account.ledger)||!Number.isFinite(b.account.initial_margin_per_contract)||!Number.isFinite(b.account.maintenance_margin_per_contract)||b.account.initial_margin_per_contract<0||b.account.maintenance_margin_per_contract<0||(b.account.initial_margin_per_contract&&b.account.maintenance_margin_per_contract&&b.account.initial_margin_per_contract<b.account.maintenance_margin_per_contract))throw Error("模擬帳戶備份資料格式錯誤");
+   if(b.account.version!==1||!Number.isFinite(b.account.balance)||!Array.isArray(b.account.ledger)||!Number.isFinite(b.account.initial_margin_per_contract)||!Number.isFinite(b.account.maintenance_margin_per_contract)||b.account.initial_margin_per_contract<0||b.account.maintenance_margin_per_contract<0||(b.account.initial_margin_per_contract&&b.account.maintenance_margin_per_contract&&b.account.initial_margin_per_contract<b.account.maintenance_margin_per_contract))throw Error("模擬帳戶備份資料格式錯誤");
    for(const item of b.account.ledger)if(!item||!["initial_capital","deposit","realized_pnl"].includes(item.type)||!Number.isFinite(item.amount)||typeof item.recorded_at!=="string"||!Number.isFinite(Date.parse(item.recorded_at)))throw Error("資金異動紀錄格式錯誤");
   }
   const existingById=new Map(db.events.map(x=>[x.entry_id,x])),ids=new Set(existingById.keys()),incoming=b.journal.events,incomingIds=new Set();
