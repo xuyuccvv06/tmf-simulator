@@ -52,6 +52,14 @@ test('historical margin is loaded before replay and applied by after-close effec
   assert.match(html, /account\.maintenance_margin_per_contract=Number\(row\.maintenance\)/);
 });
 
+test('daily profit giveback is tracked for reporting but does not block new trades', () => {
+  assert.match(html, /replayRisk\.dayPeakNet=Math\.max/);
+  assert.match(html, /replayRisk\.profitGiveback=Math\.max/);
+  assert.match(html, /replayRisk\.maxProfitGiveback=Math\.max/);
+  assert.match(html, /當日獲利回吐/);
+  assert.doesNotMatch(html, /profitGiveback[^;{}]*blockedDate/);
+});
+
 test('margin calls persist to the next trading-day noon and are included in snapshots', () => {
   assert.match(html, /function evaluateMarginCall\(bar\)/);
   assert.match(html, /dates\.find\(d=>d>bar\.d\)/);
