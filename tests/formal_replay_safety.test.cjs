@@ -44,13 +44,13 @@ test('daily 4 percent loss and 5/9/12 loss warnings enforce the entry gate', () 
   assert.match(html, /風控已封鎖今日新增進場/);
 });
 
-test('margin calls persist to the next trading-day noon and pause with replay time', () => {
+test('margin calls persist to the next trading-day noon and are included in snapshots', () => {
   assert.match(html, /function evaluateMarginCall\(bar\)/);
   assert.match(html, /dates\.find\(d=>d>bar\.d\)/);
   assert.match(html, /deadline:next\+" 12:00"/);
   assert.match(html, /保證金追繳期限屆滿強制平倉/);
   assert.match(html, /marginCallStatus/);
-  assert.match(html, /marginCall, replayRisk/);
+  assert.match(html, /account,marginLiquidationPending,marginCall,replayRisk/);
 });
 
 test('formal mode cumulative stats use only revealed completed exits from the active dataset', () => {
@@ -60,8 +60,9 @@ test('formal mode cumulative stats use only revealed completed exits from the ac
   assert.match(html, /e\.context\?\.replay_dataset_id===replayDatasetId/);
 });
 
-test('existing account and behaviour journal keys are not deleted or cleared', () => {
-  assert.doesNotMatch(html, /localStorage\.clear\(/);\n  assert.match(html, /old\.key\.startsWith\(REPLAY_STATE_PREFIX/);
+test('existing journals are not cleared and pruning is limited to feature-owned backup keys', () => {
+  assert.doesNotMatch(html, /localStorage\.clear\(/);
+  assert.match(html, /old\.key\.startsWith\(REPLAY_STATE_PREFIX/);
   assert.match(html, /tmf\.behaviourJournal\."\+SIM_MODE/);
   assert.match(html, /tmf\.sim\.account\."\+SIM_MODE/);
 });
