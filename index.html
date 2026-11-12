@@ -241,7 +241,7 @@ async function saveReplayDatasetToJournalDB(rawText,sourceBars){
  });
  try{
   const hash=[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(rawText)))].map(x=>x.toString(16).padStart(2,"0")).join("");
-  const datasetId="ds_"+hash.slice(0,16),bars=sourceBars.map(x=>({timestamp:new Date(x.t.replace(" ","T")+"+08:00").toISOString(),open:x.o,high:x.h,low:x.l,close:x.c,volume:x.v}));
+  const datasetId="ds_"+hash.slice(0,16),bars=sourceBars.map(x=>({timestamp:new Date(x.t.replace(" ","T")+"+08:00").toISOString(),market_timestamp:x.t,trading_date:x.d,open:x.o,high:x.h,low:x.l,close:x.c,volume:x.v}));
   const chunkSize=5000,chunks=[],descriptors=[];
   for(let i=0;i<bars.length;i+=chunkSize){
    const part=bars.slice(i,i+chunkSize),chunkIndex=descriptors.length,chunkId=datasetId+"_"+String(chunkIndex).padStart(6,"0");
@@ -257,6 +257,44 @@ async function saveReplayDatasetToJournalDB(rawText,sourceBars){
   });
   return {datasetId,rowCount:bars.length,chunkCount:chunks.length};
  }finally{journalDB.close();}
+}
+async function listReplayDatasetsFromJournalDB(){
+ const request=indexedDB.open("tmf-journal-store-v1",2);
+ const db=await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+ try{
+  return await new Promise((resolve,reject)=>{
+   const tx=db.transaction(["datasets"],"readonly"),req=tx.objectStore("datasets").getAll();
+   req.onsuccess=()=>resolve(req.result.map(x=>x.meta).filter(Boolean));
+   req.onerror=()=>reject(req.error);
+  });
+ }finally{db.close();}
+}
+async function loadReplayDatasetFromJournalDB(datasetId){
+ const request=indexedDB.open("tmf-journal-store-v1",2);
+ const db=await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+ try{
+  const result=await new Promise((resolve,reject)=>{
+   const tx=db.transaction(["datasets","dataset_chunks"],"readonly");
+   const metaReq=tx.objectStore("datasets").get(datasetId);
+   const chunksReq=tx.objectStore("dataset_chunks").index("dataset_id").getAll(datasetId);
+   tx.oncomplete=()=>resolve({meta:metaReq.result?.meta,chunks:chunksReq.result||[]});
+   tx.onerror=()=>reject(tx.error||new Error("資料集讀取失敗"));
+  });
+  if(!result.meta||!result.chunks.length)throw new Error("找不到此資料集的完整備份。");
+  const bars=result.chunks.sort((a,b)=>a.chunk_index-b.chunk_index).flatMap(x=>x.bars||[]).map(x=>{
+   if(!x.market_timestamp||!x.trading_date)throw new Error("此舊版資料集缺少交易時間／交易日欄位，請重新匯入原始 CSV。");
+   return {t:x.market_timestamp,d:x.trading_date,o:x.open,h:x.high,l:x.low,c:x.close,v:x.volume};
+  });
+  if(bars.length!==result.meta.row_count)throw new Error("資料集筆數驗證失敗。");
+  return {meta:result.meta,bars};
+ }finally{db.close();}
+}
+function buildReplayDates(sourceBars){
+ return [...new Set(sourceBars.filter(x=>x.t.slice(11,16)>="08:45"&&x.t.slice(11,16)<="13:45").map(x=>x.t.slice(0,10)))].sort();
+}
+function populateReplaySessions(){
+ const session=$("session");session.innerHTML="";
+ dates.forEach(d=>{const o=document.createElement("option");o.value=d;o.textContent=d;session.appendChild(o);});
 }
 function parseCSV(text){
  const lines=text.trim().split(/\r?\n/); const head=lines.shift().split(',');
