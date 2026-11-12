@@ -755,6 +755,17 @@ function replayStatePayload(){
   savedAt:new Date().toISOString(),revealed,selectedIndex,viewStart,position,pendingOrder,realizedPoints,lastTrade,
   account,marginLiquidationPending,marginCall,replayRisk};
 }
+function validateReplayBackupEnvelope(s){
+ if(!s||s.schema!==1||s.mode!==SIM_MODE||s.datasetId!==replayDatasetId||
+    typeof s.session!=="string"||!["day","night"].includes(s.replayMode)||
+    !Number.isInteger(s.revealed)||s.revealed<1||
+    !Number.isInteger(s.selectedIndex)||s.selectedIndex<0||
+    !Number.isInteger(s.viewStart)||s.viewStart<0||
+    !s.account||!Number.isFinite(s.account.balance)||!Array.isArray(s.account.ledger)||
+    !s.account.ledger.every(x=>x&&Number.isFinite(x.amount)))return false;
+ const ledgerTotal=s.account.ledger.reduce((sum,x)=>sum+x.amount,0);
+ return Math.abs(ledgerTotal-s.account.balance)<=0.02&&typeof s.checksum==="string"&&s.checksum===replayChecksum(s);
+}
 function validateReplayState(s){
  if(!s||s.schema!==1||s.mode!==SIM_MODE||s.datasetId!==replayDatasetId||
     typeof s.session!=="string"||!["day","night"].includes(s.replayMode)||
@@ -1010,8 +1021,8 @@ $("exportReplayBackups").onclick=()=>{
  const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]");
  const backups=[];
  for(const item of index){
-  if(!item||typeof item.key!=="string"||!item.key.startsWith(prefix)||item.session!==replayStartDate||item.replayMode!==replayStartMode)continue;
-  try{const snapshot=JSON.parse(localStorage.getItem(item.key)||"null");if(validateReplayState(snapshot))backups.push({key:item.key,meta:item,snapshot});}catch{}
+  if(!item||typeof item.key!=="string"||!item.key.startsWith(prefix))continue;
+  try{const snapshot=JSON.parse(localStorage.getItem(item.key)||"null");if(validateReplayBackupEnvelope(snapshot))backups.push({key:item.key,meta:item,snapshot});}catch{}
  }
  if(!backups.length){alert("目前場次沒有有效備份可匯出。");return;}
  let formalDecisionLog=null;try{formalDecisionLog=JSON.parse(localStorage.getItem(formalDecisionKey())||"null");}catch{}
@@ -1027,10 +1038,10 @@ $("replayBackupFile").onchange=async()=>{
  const file=$("replayBackupFile").files?.[0];if(!file)return;
  try{
   const payload=JSON.parse(await file.text());
-  if(payload.schema!==1||payload.mode!==SIM_MODE||payload.datasetId!==replayDatasetId||payload.session!==replayStartDate||payload.replayMode!==replayStartMode||!Array.isArray(payload.backups))throw new Error("備份檔與目前模式、資料集或場次不一致。");
+  if(payload.schema!==1||payload.mode!==SIM_MODE||payload.datasetId!==replayDatasetId||!Array.isArray(payload.backups))throw new Error("備份檔與目前模式、資料集或場次不一致。");
   const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]"),added=[];
   for(const item of payload.backups){
-   if(!item||!item.snapshot||!validateReplayState(item.snapshot)||item.snapshot.session!==replayStartDate||item.snapshot.replayMode!==replayStartMode)continue;
+   if(!item||!item.snapshot||!validateReplayBackupEnvelope(item.snapshot))continue;
    let snapshot={...item.snapshot},key=snapshot.key;
    if(typeof key!=="string"||!key.startsWith(REPLAY_STATE_PREFIX+replayDatasetId+"."))continue;
    const existingRaw=localStorage.getItem(key);
@@ -1059,7 +1070,7 @@ $("replayBackupFile").onchange=async()=>{
   if(!added.length&&!decisionLogImported)throw new Error("檔案內沒有可通過完整性驗證且可匯入的備份或決策紀錄。");
   const merged=[...added,...index].filter((x,i,a)=>a.findIndex(y=>y.key===x.key&&y.savedAt===x.savedAt)===i).slice(0,60);
   localStorage.setItem(REPLAY_BACKUP_INDEX,JSON.stringify(merged));
-  if(payload.formalRunLock&&SIM_MODE==="formal"&&!formalRunLock&&payload.formalRunLock.datasetId===replayDatasetId&&payload.formalRunLock.startDate===replayStartDate&&payload.formalRunLock.replayMode===replayStartMode){
+  if(payload.formalRunLock&&SIM_MODE==="formal"&&!formalRunLock&&payload.formalRunLock.datasetId===replayDatasetId&&payload.formalRunLock.startDate==="2024-07-29"&&["day","night"].includes(payload.formalRunLock.replayMode)){
    formalRunLock=payload.formalRunLock;account.costs={...formalRunLock.costs};saveAccount();localStorage.setItem(formalLockStorageKey(),JSON.stringify(formalRunLock));applyFormalLockUI();
   }
   $("replaySaveStatus").textContent="已匯入 "+added.length+" 個有效備份版本"+(decisionLogImported?"及正式決策紀錄":"")+"；既有有效資料未覆蓋。";
