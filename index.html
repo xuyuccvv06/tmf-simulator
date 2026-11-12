@@ -771,6 +771,7 @@ const originalApplyStopForState=applyManagedStop;
 applyManagedStop=function(){originalApplyStopForState();saveReplayState(false);};
 const originalApplyTargetForState=applyManagedTarget;
 applyManagedTarget=function(){originalApplyTargetForState();saveReplayState(false);};
+$("step").onclick=step;$("play").onclick=play;
 $("formalLockButton").onclick=lockFormalRun;
 $("saveReplayNow").onclick=()=>{if(saveReplayState(true))alert("已安全保存，可以離開。");};
 $("restoreReplayBackup").onclick=()=>{
