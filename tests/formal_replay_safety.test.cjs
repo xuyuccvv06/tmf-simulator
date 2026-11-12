@@ -7,7 +7,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
 test('replay snapshots are mode- and dataset-scoped and validate before restore', () => {
   assert.match(html, /REPLAY_STATE_PREFIX="tmf\.replay\.state\."\+SIM_MODE/);
-  assert.match(html, /function replayStateKey\(date,mode\)/);
+  assert.match(html, /function replayStateKey\(date,mode,stamp\)/);
   assert.match(html, /function validateReplayState\(s\)/);
   assert.match(html, /function restoreReplayState\(date,mode\)/);
   assert.match(html, /s\.mode===SIM_MODE/);
