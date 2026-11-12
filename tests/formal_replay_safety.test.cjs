@@ -90,7 +90,7 @@ test('portable backup import preserves an existing valid snapshot instead of ove
 
 test('existing journals are not cleared and pruning is limited to feature-owned backup keys', () => {
   assert.doesNotMatch(html, /localStorage\.clear\(/);
-  assert.match(html, /old\.key\.startsWith\(REPLAY_STATE_PREFIX/);
+  assert.match(html, /x\.key\.startsWith\(prefix\)/);
   assert.match(html, /tmf\.behaviourJournal\."\+SIM_MODE/);
   assert.match(html, /tmf\.sim\.account\."\+SIM_MODE/);
 });
