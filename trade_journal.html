@@ -95,6 +95,7 @@ async function readDataset(file){
  return {meta:{dataset_id:"ds_"+hash.slice(0,16),dataset_sha256:hash,product_id:[...products][0],timeframe:[...frames][0],row_count:bars.length,first_timestamp:bars[0].timestamp,last_timestamp:bars[bars.length-1].timestamp},bars};
 }
 function tradeEvents(tid){return db.events.filter(e=>e.trade_id===tid);}
+function tradeDirection(events){const entry=events.find(e=>e.event_type==="entry");const text=String(entry?.narrative||"")+" "+String(entry?.context?.side||entry?.context?.direction||"");if(/空單|\bshort\b/i.test(text))return "空單";if(/多單|\blong\b/i.test(text))return "多單";return "方向未記錄";}
 function permitted(tid,type){const t=tradeEvents(tid).map(e=>e.event_type);if(type==="pre_trade")return !t.includes("entry");if(type==="entry")return !t.includes("entry")&&!t.includes("exit")&&!t.includes("post_trade");if(type==="management")return t.includes("entry")&&!t.includes("exit")&&!t.includes("post_trade");if(type==="exit")return t.includes("entry")&&!t.includes("exit")&&!t.includes("post_trade");if(type==="post_trade")return t.includes("exit")&&!t.includes("post_trade");return false;}
 function eventVoided(eventId,events){
  const voided=new Set();
@@ -154,9 +155,9 @@ function render(){
  const tids=[...new Set(db.events.filter(e=>e.trade_id&&!["amendment","void"].includes(e.event_type)).map(e=>e.trade_id))].reverse();
  $("tradeCount").textContent=tids.length+" 筆";$("tradeList").innerHTML="";
  if(!tids.length)$("tradeList").textContent="尚無交易紀錄";
- tids.forEach(tid=>{const es=tradeEvents(tid).filter(e=>!["amendment","void"].includes(e.event_type)),types=es.map(e=>e.event_type),b=document.createElement("button");b.className="trade"+(selected===tid?" active":"");b.textContent=(es[0]?.context?.title||tid)+" · "+es.length+" 個事件"+(types.includes("post_trade")?" · 已回顧":" · 紀錄中");b.onclick=()=>{selected=tid;render();drawChart();};$("tradeList").append(b);});
+ tids.forEach(tid=>{const es=tradeEvents(tid).filter(e=>!["amendment","void"].includes(e.event_type)),types=es.map(e=>e.event_type),side=tradeDirection(es),b=document.createElement("button");b.className="trade"+(selected===tid?" active":"");b.textContent=side+" · "+(es[0]?.context?.title||tid)+" · "+es.length+" 個事件"+(types.includes("post_trade")?" · 已回顧":" · 紀錄中");b.onclick=()=>{selected=tid;render();drawChart();};$("tradeList").append(b);});
  $("noSelection").classList.toggle("hidden",!selected);$("selectedTrade").classList.toggle("hidden",!selected);if(!selected)return;
- const es=tradeEvents(selected);$("selectedMeta").textContent=selected+" · "+es.length+" 個事件（修正與作廢紀錄會保留）";$("timeline").innerHTML="";
+ const es=tradeEvents(selected);$("selectedMeta").textContent=tradeDirection(es)+" · "+selected+" · "+es.length+" 個事件（修正與作廢紀錄會保留）";$("timeline").innerHTML="";
  es.forEach(e=>{
   const d=document.createElement("div");d.className="event";
   const strong=document.createElement("strong");strong.textContent=labels[e.event_type]||e.event_type;
