@@ -135,7 +135,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
   <div class="stat"><small>目前回撤</small><b id="formalDrawdown">—</b></div>
   <div class="stat"><small>未實現損益</small><b id="formalUnrealized">—</b></div>
  </div>
- <p class="note" id="formalPerformanceNote">只計算目前資料集、正式模式及已揭露時間以前的完成交易。</p>
+ <div class="row" style="margin-top:8px"><button id="formalLockButton" class="primary">套用基準成本並鎖定正式測試</button></div><p class="note" id="formalLockStatus">正式測試開始前，請先鎖定資料集、交易時段與成本參數；鎖定後不可更改。</p><p class="note" id="formalPerformanceNote">只計算目前資料集、正式模式及已揭露時間以前的完成交易。</p>
 </section>
 <section class="panel" id="replaySafetyPanel">
  <b>回放保存與風控狀態</b>
@@ -287,6 +287,28 @@ function restoreLatestCompletedTrade(){
 }
 function loadDate(d){const mode=$('replayMode').value;if((position||pendingOrder)&&(replayStartDate!==d||replayStartMode!==mode)){const ok=confirm("目前仍有持倉或待成交委託。切換回放日期或起點模式會重置目前模擬狀態，確定要切換嗎？");if(!ok){$('session').value=replayStartDate||d;$('replayMode').value=replayStartMode;return}}stop();let startIndex=-1;if(mode==='night'){startIndex=all.findIndex(x=>x.d===d&&x.t.slice(11,16)>='15:00');}if(startIndex<0){startIndex=all.findIndex(x=>x.t.slice(0,10)===d&&x.t.slice(11,16)>='08:45'&&x.t.slice(11,16)<='13:45');}if(startIndex<0)startIndex=all.findIndex(x=>x.t.slice(0,10)===d);bars=startIndex<0?[]:all.slice(startIndex);replayStartDate=d;replayStartMode=mode;revealed=Math.min(1,bars.length);viewStart=0;selectedIndex=Math.max(0,revealed-1);position=null;pendingOrder=null;realizedPoints=0;lastTrade=restoreLatestCompletedTrade();marginLiquidationPending=false;updateTradeUI();$('date').textContent=d;render();const first=bars[0];setStatus(`連續回放中・${mode==='night'?'前一夜盤起點':'日盤起點'}・所選日期 ${d}・實際起點 ${first?first.t:'無資料'}・後續 ${bars.length.toLocaleString()} 根（跨日期／盤別接續）`)}
 function render(){const shown=bars.slice(0,revealed),last=shown.at(-1);$('count').textContent=`${revealed} / ${bars.length}`;$('price').textContent=last?last.c.toLocaleString('en-US'):'—';const n=Math.min(+$('visible').value,shown.length);viewStart=Math.max(0,Math.min(viewStart,shown.length-n));selectedIndex=Math.max(0,Math.min(selectedIndex,shown.length-1));$('barCursor').max=Math.max(0,shown.length-1);$('barCursor').value=selectedIndex;updateSelectedBar();draw(shown);$('step').disabled=revealed>=bars.length;renderFormalPerformance()}
+function formalLockStorageKey(){return "tmf.formal.lock.v1."+replayDatasetId;}
+function applyFormalLockUI(){
+ const locked=SIM_MODE==="formal"&&!!formalRunLock;
+ for(const id of ["commissionPerSide","baseSlippage","rangeSlippage","lowVolumePenalty","dynamicSlippage","saveCostSettings","initialMarginInput","maintenanceMarginInput","saveMarginSettings","marginHistoryDate","lookupHistoricalMargin","applyHistoricalMargin"])
+  if($(id))$(id).disabled=locked;
+ if($("formalLockButton"))$("formalLockButton").style.display=SIM_MODE==="formal"&&!locked?"block":"none";
+ if($("formalLockStatus"))$("formalLockStatus").textContent=locked?
+  "正式測試設定已鎖定｜"+formalRunLock.startDate+"｜"+(formalRunLock.replayMode==="night"?"前一夜盤＋日盤":"日盤")+"｜成本：每邊手續費 NT$"+formalRunLock.costs.commission_per_side+"、滑價 "+formalRunLock.costs.base_slippage+" 點／邊。正式測試期間不可修改。":
+  "尚未鎖定。鎖定後將固定資料集、起始日期、交易時段及交易成本，直到正式測試完成。";
+}
+function lockFormalRun(){
+ if(SIM_MODE!=="formal"||formalRunLock)return;
+ if(replayStartDate!=="2024-07-29"){alert("正式盲測必須從 2024/07/29 開始，請先選擇起始日。");return;}
+ account.costs={commission_per_side:10,base_slippage:1,range_slippage:0,low_volume_penalty:0,dynamic_slippage:false};
+ saveAccount();renderCostSettings();
+ applyHistoricalMarginForReplayDate(replayStartDate);
+ const lock={schema:1,datasetId:replayDatasetId,startDate:replayStartDate,replayMode:replayStartMode,lockedAt:new Date().toISOString(),
+  costs:{...account.costs},initialMargin:account.initial_margin_per_contract,maintenanceMargin:account.maintenance_margin_per_contract};
+ localStorage.setItem(formalLockStorageKey(),JSON.stringify(lock));formalRunLock=lock;
+ applyFormalLockUI();saveReplayState(false);
+ alert("正式測試設定已鎖定。接下來請以盲測方式完成 2024/07/29–2025/12/31 全期間；不可中途修改策略或成本參數。");
+}
 function renderFormalPerformance(){
  const ids=["formalNetPnl","formalWinRate","formalTradeCount","formalEquity","formalDrawdown","formalUnrealized"];
  if(!ids.every(id=>$(id)))return;
@@ -521,7 +543,7 @@ document.querySelector("header h1").insertAdjacentHTML("beforeend",' <span class
 const REPLAY_STATE_PREFIX="tmf.replay.state."+SIM_MODE+".v1.";
 const REPLAY_BACKUP_INDEX="tmf.replay.backups."+SIM_MODE+".v1";
 document.getElementById("formalPerformancePanel").style.display=SIM_MODE==="formal"?"block":"none";
-let replayDatasetId="unverified", replayStateReady=false, marginCall=null, replayRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+let replayDatasetId="unverified", replayStateReady=false, marginCall=null, formalRunLock=null, replayRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
 function replayStateKey(date,mode,stamp){return REPLAY_STATE_PREFIX+replayDatasetId+"."+date+"."+mode+"."+(stamp||new Date().toISOString().replace(/[:.]/g,"-"));}
 function replayChecksum(value){
  const copy={...value};delete copy.checksum;
