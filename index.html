@@ -516,17 +516,33 @@ function replayStatePayload(){
   account,marginLiquidationPending,replayRisk};
 }
 function validateReplayState(s){
- return !!s&&s.schema===1&&s.mode===SIM_MODE&&s.datasetId===replayDatasetId&&typeof s.session==="string"&&
-  Number.isInteger(s.revealed)&&s.revealed>=0&&s.revealed<=bars.length&&
-  Number.isInteger(s.selectedIndex)&&s.selectedIndex>=0&&
-  s.account&&Number.isFinite(s.account.balance)&&Array.isArray(s.account.ledger)&&
-  (s.position===null||(s.position&&["多","空"].includes(s.position.side)&&Number.isSafeInteger(s.position.entry)))&&
-  (s.pendingOrder===null||(s.pendingOrder&&typeof s.pendingOrder.type==="string"))&&typeof s.checksum==="string"&&s.checksum===replayChecksum(s);
+ if(!s||s.schema!==1||s.mode!==SIM_MODE||s.datasetId!==replayDatasetId||
+    typeof s.session!=="string"||s.replayMode!==$("replayMode").value&&s.session===replayStartDate||
+    !Number.isInteger(s.revealed)||s.revealed<1||s.revealed>bars.length||
+    !Number.isInteger(s.selectedIndex)||s.selectedIndex<0||s.selectedIndex>=s.revealed||
+    !Number.isInteger(s.viewStart)||s.viewStart<0||s.viewStart>=s.revealed||
+    !s.account||!Number.isFinite(s.account.balance)||!Array.isArray(s.account.ledger)||
+    !s.account.ledger.every(x=>x&&Number.isFinite(x.amount)))return false;
+ const ledgerTotal=s.account.ledger.reduce((sum,x)=>sum+x.amount,0);
+ if(Math.abs(ledgerTotal-s.account.balance)>0.02)return false;
+ if(s.position!==null){
+  if(!s.position||!["多","空"].includes(s.position.side)||!Number.isSafeInteger(s.position.entry)||
+     !bars.some((b,i)=>i<s.revealed&&b.t===s.position.entryTime))return false;
+  for(const level of [s.position.stopLoss,s.position.takeProfit])if(level!==null&&!Number.isSafeInteger(level))return false;
+ }
+ if(s.pendingOrder!==null){
+  const p=s.pendingOrder;
+  if(!p||!["buy","sell","close","limitBuy","limitSell"].includes(p.type))return false;
+  if((p.type==="limitBuy"||p.type==="limitSell")&&(!Number.isSafeInteger(p.limitPrice)||p.submittedAt!==bars[s.revealed-1]?.t))return false;
+  if(["buy","sell","limitBuy","limitSell"].includes(p.type)&&s.position)return false;
+ }
+ return typeof s.checksum==="string"&&s.checksum===replayChecksum(s);
 }
 function saveReplayState(manual=false){
  if(!replayStartDate||!bars.length)return false;
  try{
   const snapshot=replayStatePayload();snapshot.checksum=replayChecksum(snapshot);const key=snapshot.key,raw=JSON.stringify(snapshot);
+  if(!validateReplayState(JSON.parse(raw)))throw new Error("保存前完整性驗證未通過");
   localStorage.setItem(key,raw);
   const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]");
   const entry={key,savedAt:snapshot.savedAt,bytes:raw.length,session:snapshot.session,replayMode:snapshot.replayMode};
