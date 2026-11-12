@@ -109,7 +109,7 @@ test('historical margin is automatically applied by replay trading date and manu
 test('historical margin data loads before replay initialization and manual controls are wired', () => {
   assert.match(html, /\$\("lookupHistoricalMargin"\)\.onclick=lookupHistoricalMargin/);
   assert.match(html, /\$\("applyHistoricalMargin"\)\.onclick=applyHistoricalMargin/);
-  assert.match(html, /async function init\(\)\{try\{await loadHistoricalMarginData\(\)/);
+  assert.match(html, /async function init\(\)\{\s*try\{\s*await loadHistoricalMarginData\(\)/);
 });
 
 test('new simulation accounts start with the confirmed baseline trading costs', () => {
