@@ -10,7 +10,7 @@ test('replay snapshots are mode- and dataset-scoped and validate before restore'
   assert.match(html, /function replayStateKey\(date,mode\)/);
   assert.match(html, /function validateReplayState\(s\)/);
   assert.match(html, /function restoreReplayState\(date,mode\)/);
-  assert.match(html, /s\.mode!==SIM_MODE/);
+  assert.match(html, /s\.mode===SIM_MODE/);
   assert.match(html, /s\.session!==date/);
 });
 
