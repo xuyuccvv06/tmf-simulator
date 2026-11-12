@@ -610,13 +610,15 @@ function loadFormalLockForDataset(){
 async function switchReplayDataset(datasetId){
  if(!datasetId||datasetId===replayDatasetId)return;
  if(SIM_MODE==="formal"&&formalRunLock){$("datasetSelector").value=replayDatasetId;$("datasetStatus").textContent="正式測試設定已鎖定，測試期間不可切換資料集。";return;}
+ const select=$("datasetSelector");select.disabled=true;
  try{
   saveReplayState(false);saveAccount();
-  const loaded=await loadReplayDatasetFromJournalDB(datasetId);
-  replayStateReady=false;replayDatasetId=datasetId;all=loaded.bars;account=freshAccount();
+  const loaded=await loadReplayDatasetFromJournalDB(datasetId),nextDates=buildReplayDates(loaded.bars);
+  if(!nextDates.length)throw new Error("此資料集沒有可回放的日盤交易日。");
+  replayStateReady=false;replayDatasetId=datasetId;all=loaded.bars;dates=nextDates;account=freshAccount();
   position=null;pendingOrder=null;marginCall=null;marginLiquidationPending=false;
   replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[]};
-  dates=buildReplayDates(all);populateReplaySessions();if(!dates.length)throw new Error("此資料集沒有可回放的日盤交易日。");
+  populateReplaySessions();
   localStorage.setItem(selectedDatasetStorageKey(),datasetId);
   loadFormalLockForDataset();
   const startDate=formalRunLock?formalRunLock.startDate:dates[0];
@@ -628,7 +630,7 @@ async function switchReplayDataset(datasetId){
  }catch(err){
   $("datasetSelector").value=replayDatasetId;
   $("datasetStatus").textContent="資料集切換失敗，原資料集未覆蓋："+err.message;
- }
+ }finally{select.disabled=SIM_MODE==="formal"&&!!formalRunLock;}
 }
 async function importReplayDatasetFile(){
  const file=$("datasetUploadFile").files?.[0];if(!file)return;
