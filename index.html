@@ -647,9 +647,9 @@ function renderMarginCall(){
  if(!marginCall||!position){el.textContent="目前沒有保證金追繳通知。";return;}
  const equity=accountMetrics().equity,required=account.initial_margin_per_contract*1,amount=Math.max(0,required-equity);
  const current=bars[Math.max(0,revealed-1)]?.t;
- const remain=current?Math.max(0,Date.parse(marginCall.deadline.replace(" ","T")+":00+08:00")-Date.parse(current.replace(" ","T")+"+08:00")):0;
- const hours=Math.floor(remain/3600000),minutes=Math.floor((remain%3600000)/60000);
- el.textContent="保證金追繳中｜補足至原始保證金尚需 "+money(amount)+"｜期限 "+marginCall.deadline+"｜模擬剩餘 "+hours+" 小時 "+minutes+" 分。期限前可追加資金或自行平倉；目前固定 1 口，無法做部分口數減倉。";
+ const remain=current&&marginCall.deadline?Math.max(0,Date.parse(marginCall.deadline.replace(" ","T")+":00+08:00")-Date.parse(current.replace(" ","T")+"+08:00")):null;
+ const countdown=remain===null?"資料集未涵蓋下一交易日，期限無法在本資料中模擬":("模擬剩餘 "+Math.floor(remain/3600000)+" 小時 "+Math.floor((remain%3600000)/60000)+" 分");
+ el.textContent="保證金追繳中｜補足至原始保證金尚需 "+money(amount)+"｜期限 "+(marginCall.deadline||"待下一交易日資料")+"｜"+countdown+"。期限前可追加資金或自行平倉；目前固定 1 口，無法做部分口數減倉。";
 }
 function evaluateMarginCall(bar){
  if(!position){marginCall=null;marginLiquidationPending=false;renderMarginCall();return;}
