@@ -628,7 +628,7 @@ saveAccount=function(){
 };
 const originalLoadDateForState=loadDate;
 loadDate=function(date){
- const requestedMode=$("replayMode").value;
+ const requestedMode=$("replayMode").value,hadPriorReplay=replayStateReady;
  if(replayStateReady){
   saveReplayState(false);
   saveAccount();
@@ -641,8 +641,8 @@ loadDate=function(date){
  if(!restored){
   try{
    const saved=JSON.parse(localStorage.getItem(datasetAccountKey(date,requestedMode))||"null");
-   account=saved&&saved.version===1&&Number.isFinite(saved.balance)&&Array.isArray(saved.ledger)?saved:freshAccount();
-  }catch{account=freshAccount();}
+   account=saved&&saved.version===1&&Number.isFinite(saved.balance)&&Array.isArray(saved.ledger)?saved:(hadPriorReplay?freshAccount():account);
+  }catch{account=hadPriorReplay?freshAccount():account;}
   saveAccount();
   replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
   render();updateTradeUI();
