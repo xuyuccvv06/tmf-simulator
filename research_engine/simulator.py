@@ -8,6 +8,7 @@ limit price (then configured adverse exit slippage).
 from math import isfinite
 
 from .models import Bar, Order, Trade
+from .costs import TMFCostConfig, DynamicSlippageConfig, calculate_round_trip_cost_twd, dynamic_slippage_points
 from .validation import validate_bars
 
 
@@ -26,6 +27,8 @@ def simulate(
     *,
     round_trip_cost_points: float = 5.3,
     slippage_points: float = 0.0,
+    tmf_cost_config: TMFCostConfig | None = None,
+    dynamic_slippage_config: DynamicSlippageConfig | None = None,
 ) -> list[Trade]:
     """Simulate each order independently, entering at the next bar's open.
 
@@ -41,6 +44,10 @@ def simulate(
         raise ValueError("round_trip_cost_points must be finite and non-negative")
     if not isfinite(slippage_points) or slippage_points < 0:
         raise ValueError("slippage_points must be finite and non-negative")
+    if tmf_cost_config is not None:
+        tmf_cost_config.validate()
+    if dynamic_slippage_config is not None:
+        dynamic_slippage_config.validate()
     if not bars:
         return []
 
@@ -53,7 +60,9 @@ def simulate(
 
         direction = 1 if order.side == "long" else -1
         entry_bar = bars[i + 1]
-        entry = entry_bar.open + direction * slippage_points
+        entry_slippage = (dynamic_slippage_points(bars, i + 1, dynamic_slippage_config)
+                          if dynamic_slippage_config is not None else slippage_points)
+        entry = entry_bar.open + direction * entry_slippage
         exit_i = len(bars) - 1
         exit_price = bars[-1].close
         reason = "end_of_data"
@@ -86,9 +95,14 @@ def simulate(
                     break
 
         # Exit slippage is always adverse to the position.
-        exit_price -= direction * slippage_points
+        exit_slippage = (dynamic_slippage_points(bars, exit_i, dynamic_slippage_config)
+                         if dynamic_slippage_config is not None else slippage_points)
+        exit_price -= direction * exit_slippage
         gross = (exit_price - entry) * direction
-        cost = round_trip_cost_points
+        if tmf_cost_config is not None:
+            cost = calculate_round_trip_cost_twd(entry, exit_price, tmf_cost_config)["total_points"]
+        else:
+            cost = round_trip_cost_points
         trades.append(
             Trade(
                 order.side,
