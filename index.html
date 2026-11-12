@@ -533,7 +533,32 @@ loadDate=function(date){
  if(!restored)saveReplayState(false);
 };
 const originalStepForState=step;
-step=function(){originalStepForState();saveReplayState(false);};
+step=function(){
+ const nextBar=bars[revealed],nextDate=nextBar?.d||null;
+ if(nextDate&&replayRisk.tradingDate!==nextDate){
+  replayRisk={tradingDate:nextDate,dayStartEquity:accountMetrics().equity,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+ }
+ originalStepForState();
+ const current=bars[Math.max(0,revealed-1)];
+ if(current&&replayRisk.tradingDate===current.d){
+  const equity=accountMetrics().equity;
+  replayRisk.dayNet=equity-replayRisk.dayStartEquity;
+  if(replayRisk.dayNet<=-Math.abs(replayRisk.dayStartEquity)*0.04){
+   replayRisk.blockedDate=current.d;
+   if(!replayRisk.blockReasons.includes("daily_loss_4pct"))replayRisk.blockReasons.push("daily_loss_4pct");
+   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type))pendingOrder=null;
+  }
+  if(replayRisk.lossStreak>=12){
+   replayRisk.blockedDate=current.d;
+   if(!replayRisk.blockReasons.includes("loss_streak_12"))replayRisk.blockReasons.push("loss_streak_12");
+   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type))pendingOrder=null;
+  }
+  const gate=$("riskGateStatus"),status=$("riskStatus");
+  if(gate)gate.textContent=replayRisk.blockedDate===current.d?"已封鎖新增進場":replayRisk.lossStreak>=9?"連虧警戒":"正常";
+  if(status)status.textContent="交易日 "+current.d+"｜當日損益 "+Math.round(replayRisk.dayNet).toLocaleString("zh-TW")+" 元｜連續虧損 "+replayRisk.lossStreak+" 次｜觸發："+(replayRisk.blockReasons.join("、")||"無");
+ }
+ saveReplayState(false);
+};
 const originalFinishForState=finishPosition;
 finishPosition=function(...args){
  const priorBalance=account.balance;
@@ -541,6 +566,11 @@ finishPosition=function(...args){
  const delta=account.balance-priorBalance;
  if(delta<0)replayRisk.lossStreak=(replayRisk.lossStreak||0)+1;
  else if(delta>0)replayRisk.lossStreak=0;
+ if(replayRisk.lossStreak>=12){
+  replayRisk.blockedDate=bars[Math.max(0,revealed-1)]?.d||replayStartDate;
+  if(!replayRisk.blockReasons.includes("loss_streak_12"))replayRisk.blockReasons.push("loss_streak_12");
+  if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type))pendingOrder=null;
+ }
  saveReplayState(false);
 };
 const originalDepositForState=depositFunds;
