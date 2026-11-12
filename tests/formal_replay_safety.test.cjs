@@ -68,6 +68,12 @@ test('formal mode cumulative stats use only revealed completed exits from the ac
   assert.match(html, /e\.context\?\.replay_dataset_id===replayDatasetId/);
 });
 
+test('portable backup import preserves an existing valid snapshot instead of overwriting it', () => {
+  assert.match(html, /const existingRaw=localStorage\.getItem\(key\)/);
+  assert.match(html, /existing\.checksum===snapshot\.checksum/);
+  assert.match(html, /snapshot\.key=key;snapshot\.checksum=replayChecksum\(snapshot\)/);
+});
+
 test('existing journals are not cleared and pruning is limited to feature-owned backup keys', () => {
   assert.doesNotMatch(html, /localStorage\.clear\(/);
   assert.match(html, /old\.key\.startsWith\(REPLAY_STATE_PREFIX/);
