@@ -74,7 +74,7 @@ test('TMF official margin history is ordered, bounded and contains all three mar
     assert.ok(row.effective_date >= margins.period_start && row.effective_date <= margins.period_end);
     assert.ok(Number.isInteger(row.initial) && Number.isInteger(row.maintenance) && Number.isInteger(row.settlement));
     assert.ok(row.initial >= row.maintenance && row.maintenance >= row.settlement);
-    assert.match(row.source, /^https:\\/\\/www\\.taifex\\.com\\.tw\\//);
+    assert.ok(row.source.startsWith('https://www.taifex.com.tw/'));
   }
   assert.equal(new Set(dates).size, dates.length);
 });
