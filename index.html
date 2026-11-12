@@ -956,9 +956,10 @@ step=function(){
 };
 const originalFinishForState=finishPosition;
 finishPosition=function(...args){
- const priorBalance=account.balance;
+ const priorBalance=account.balance,closedPosition=position?{side:position.side,entry:position.entry,entryTime:position.entryTime}:null;
  originalFinishForState(...args);
  const delta=account.balance-priorBalance;
+ if(closedPosition)recordFormalDecision("position_closed",{direction:closedPosition.side,entryPrice:closedPosition.entry,entryTimestamp:closedPosition.entryTime,exitPrice:args[0],exitTimestamp:args[1],exitReason:args[2]||"未註明",netPnlTwd:delta});
  if(!position){marginCall=null;marginLiquidationPending=false;renderMarginCall();}
  if(delta<0)replayRisk.lossStreak=(replayRisk.lossStreak||0)+1;
  else if(delta>0)replayRisk.lossStreak=0;
@@ -976,9 +977,17 @@ depositFunds=function(){
  if(position)checkMargin();renderMarginCall();renderFormalPerformance();saveReplayState(false);
 };
 const originalApplyStopForState=applyManagedStop;
-applyManagedStop=function(){originalApplyStopForState();saveReplayState(false);};
+applyManagedStop=function(){
+ const before=position?.stopLoss;originalApplyStopForState();
+ if(position&&position.stopLoss!==before)recordFormalDecision("position_stop_modified",{direction:position.side,oldStop:before,newStop:position.stopLoss});
+ saveReplayState(false);
+};
 const originalApplyTargetForState=applyManagedTarget;
-applyManagedTarget=function(){originalApplyTargetForState();saveReplayState(false);};
+applyManagedTarget=function(){
+ const before=position?.takeProfit;originalApplyTargetForState();
+ if(position&&position.takeProfit!==before)recordFormalDecision("position_target_modified",{direction:position.side,oldTarget:before,newTarget:position.takeProfit});
+ saveReplayState(false);
+};
 $("step").onclick=step;$("play").onclick=play;
 $("formalLockButton").onclick=lockFormalRun;
 $("saveReplayNow").onclick=()=>{if(saveReplayState(true))alert("已安全保存，可以離開。");};
