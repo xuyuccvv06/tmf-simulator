@@ -410,7 +410,7 @@ $('barCursor').oninput=()=>{selectedIndex=+$('barCursor').value;updateSelectedBa
 $('cursorLatest').onclick=()=>{selectedIndex=Math.max(0,revealed-1);$('barCursor').value=selectedIndex;const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);updateSelectedBar();draw(bars.slice(0,revealed));};
 $('buy').onclick=()=>placeMarketOrder('buy');$('sell').onclick=()=>placeMarketOrder('sell');$('close').onclick=()=>placeMarketOrder('close');
 $('step').onclick=step;$('play').onclick=play;$('applyStop').onclick=applyManagedStop;$('applyTarget').onclick=applyManagedTarget;$('reset').onclick=()=>loadDate($('session').value);$('speed').onchange=()=>{if(timer){stop();play()}};$('visible').onchange=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);if(selectedIndex<viewStart)selectedIndex=viewStart;render()};$('latest').onclick=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);render()};$('session').onchange=()=>loadDate($('session').value);$('replayMode').onchange=()=>loadDate($('session').value);$('newSession').onclick=()=>{const d=dates[Math.floor(Math.random()*dates.length)];$('session').value=d;loadDate(d)};
-async function init(){try{setStatus('正在載入 CSV…');const res=await fetch('./TMFR1_5min_2024-2025.csv');if(!res.ok)throw new Error(`CSV 載入失敗：HTTP ${res.status}`);const rawCsv=await res.text();all=parseCSV(rawCsv);if(!all.length)throw new Error('CSV 沒有可用行情');all.sort((a,b)=>a.t.localeCompare(b.t));let backupSync='';try{const saved=await saveReplayDatasetToJournalDB(rawCsv,all);backupSync=`・完整行情已同步備份（${saved.rowCount.toLocaleString()} 根）`;}catch(syncError){backupSync='・行情備份同步失敗：'+syncError.message;}dates=[...new Set(all.filter(x=>x.t.slice(11,16)>='08:45'&&x.t.slice(11,16)<='13:45').map(x=>x.t.slice(0,10)))].sort();dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;$('session').appendChild(o)});$('session').value=dates[0];loadDate(dates[0]);setStatus(`資料載入完成・${all.length.toLocaleString()} 根${backupSync}`)}catch(e){setStatus('載入失敗');const msg=document.createElement('p');msg.className='note';msg.style.color='#f06468';msg.textContent=e.message+'。請確認 CSV 與 HTML 位於同一個 GitHub Repository 根目錄，並透過 GitHub Pages 網址開啟。';document.querySelector('main').prepend(msg)}}
+async function init(){try{setStatus('正在載入 CSV…');const res=await fetch('./TMFR1_5min_2024-2025.csv');if(!res.ok)throw new Error(`CSV 載入失敗：HTTP ${res.status}`);const rawCsv=await res.text();all=parseCSV(rawCsv);if(!all.length)throw new Error('CSV 沒有可用行情');all.sort((a,b)=>a.t.localeCompare(b.t));let backupSync='';try{const saved=await saveReplayDatasetToJournalDB(rawCsv,all);replayDatasetId=saved.datasetId;backupSync=`・完整行情已同步備份（${saved.rowCount.toLocaleString()} 根）`;}catch(syncError){backupSync='・行情備份同步失敗：'+syncError.message;}dates=[...new Set(all.filter(x=>x.t.slice(11,16)>='08:45'&&x.t.slice(11,16)<='13:45').map(x=>x.t.slice(0,10)))].sort();dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;$('session').appendChild(o)});$('session').value=dates[0];loadDate(dates[0]);setStatus(`資料載入完成・${all.length.toLocaleString()} 根${backupSync}`)}catch(e){setStatus('載入失敗');const msg=document.createElement('p');msg.className='note';msg.style.color='#f06468';msg.textContent=e.message+'。請確認 CSV 與 HTML 位於同一個 GitHub Repository 根目錄，並透過 GitHub Pages 網址開啟。';document.querySelector('main').prepend(msg)}}
 
 /* One-bar limit-entry orders: checked only against the next revealed bar, then expire. */
 function placeLimitEntry(side){
@@ -462,16 +462,16 @@ document.querySelector("header h1").insertAdjacentHTML("beforeend",' <span class
 /* Durable replay state: additive keys only; never rewrite legacy trade journals. */
 const REPLAY_STATE_PREFIX="tmf.replay.state."+SIM_MODE+".v1.";
 const REPLAY_BACKUP_INDEX="tmf.replay.backups."+SIM_MODE+".v1";
-let replayStateReady=false, replayRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
-function replayStateKey(date,mode,stamp){return REPLAY_STATE_PREFIX+date+"."+mode+"."+(stamp||new Date().toISOString().replace(/[:.]/g,"-"));}
+let replayDatasetId="unverified", replayStateReady=false, replayRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+function replayStateKey(date,mode,stamp){return REPLAY_STATE_PREFIX+replayDatasetId+"."+date+"."+mode+"."+(stamp||new Date().toISOString().replace(/[:.]/g,"-"));}
 function replayStatePayload(){
  const key=replayStateKey(replayStartDate||$("session").value,replayStartMode||$("replayMode").value);
- return {schema:1,key,mode:SIM_MODE,session:replayStartDate||$("session").value,replayMode:replayStartMode||$("replayMode").value,
+ return {schema:1,key,mode:SIM_MODE,datasetId:replayDatasetId,session:replayStartDate||$("session").value,replayMode:replayStartMode||$("replayMode").value,
   savedAt:new Date().toISOString(),revealed,selectedIndex,viewStart,position,pendingOrder,realizedPoints,lastTrade,
   account,marginLiquidationPending,replayRisk};
 }
 function validateReplayState(s){
- return !!s&&s.schema===1&&s.mode===SIM_MODE&&typeof s.session==="string"&&
+ return !!s&&s.schema===1&&s.mode===SIM_MODE&&s.datasetId===replayDatasetId&&typeof s.session==="string"&&
   Number.isInteger(s.revealed)&&s.revealed>=0&&s.revealed<=bars.length&&
   Number.isInteger(s.selectedIndex)&&s.selectedIndex>=0&&
   s.account&&Number.isFinite(s.account.balance)&&Array.isArray(s.account.ledger)&&
@@ -525,7 +525,7 @@ function listReplayBackups(){
  }catch(err){$("replaySaveStatus").textContent="備份索引讀取失敗："+err.message;return [];}
 }
 function datasetAccountKey(date,mode){
- return "tmf.sim.account.dataset."+SIM_MODE+".v1."+date+"."+mode;
+ return "tmf.sim.account.dataset."+SIM_MODE+".v1."+replayDatasetId+"."+date+"."+mode;
 }
 saveAccount=function(){
  const date=replayStartDate||$("session").value,mode=replayStartMode||$("replayMode").value;
