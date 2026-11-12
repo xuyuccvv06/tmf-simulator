@@ -813,10 +813,10 @@ finishPosition=function(...args){
   if(!replayRisk.blockReasons.includes("loss_streak_12"))replayRisk.blockReasons.push("loss_streak_12");
   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){recordFormalDecision("entry_order_cancelled",{orderType:pendingOrder.type,reason:"連續虧損達 12 次"});pendingOrder=null;}
  }
- saveReplayState(false);
+ renderFormalPerformance();saveReplayState(false);
 };
 const originalDepositForState=depositFunds;
-depositFunds=function(){originalDepositForState();if(position)checkMargin();renderMarginCall();saveReplayState(false);};
+depositFunds=function(){originalDepositForState();if(position)checkMargin();renderMarginCall();renderFormalPerformance();saveReplayState(false);};
 const originalApplyStopForState=applyManagedStop;
 applyManagedStop=function(){originalApplyStopForState();saveReplayState(false);};
 const originalApplyTargetForState=applyManagedTarget;
