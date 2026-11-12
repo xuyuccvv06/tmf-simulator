@@ -612,7 +612,20 @@ applyManagedStop=function(){originalApplyStopForState();saveReplayState(false);}
 const originalApplyTargetForState=applyManagedTarget;
 applyManagedTarget=function(){originalApplyTargetForState();saveReplayState(false);};
 $("saveReplayNow").onclick=()=>{if(saveReplayState(true))alert("已安全保存，可以離開。");};
-$("restoreReplayBackup").onclick=()=>{const valid=listReplayBackups();if(valid.length){const latest=valid[0];if(confirm("找到 "+valid.length+" 個有效備份。要恢復最新版本（"+new Date(latest.savedAt).toLocaleString("zh-TW")+"）嗎？"))restoreReplayState(latest.session,latest.replayMode,latest.key);}};
+$("restoreReplayBackup").onclick=()=>{
+ const valid=listReplayBackups();
+ if(!valid.length){alert("目前資料集沒有可恢復的有效備份。");return;}
+ const choices=valid.map((item,i)=>(i+1)+". "+new Date(item.savedAt).toLocaleString("zh-TW")+"｜"+item.session+"｜"+item.replayMode).join("\\n");
+ const answer=prompt("選擇要恢復的有效備份，輸入編號（1 為最新）：\\n"+choices,"1");
+ if(answer===null)return;
+ const index=Number(answer)-1;
+ if(!Number.isInteger(index)||index<0||index>=valid.length){alert("備份編號無效，沒有變更目前資料。");return;}
+ const selected=valid[index];
+ if(confirm("確定恢復此版本？目前尚未保存的回放狀態會先保存。")){
+  saveReplayState(false);
+  restoreReplayState(selected.session,selected.replayMode,selected.key);
+ }
+};
 document.addEventListener("visibilitychange",()=>{if(document.hidden){stop();saveReplayState(false);}});
 window.addEventListener("pagehide",()=>{stop();saveReplayState(false);});
 window.addEventListener("beforeunload",()=>{stop();saveReplayState(false);});
