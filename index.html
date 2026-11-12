@@ -115,7 +115,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
    <div class="stat full"><small>出場原因</small><b id="recordExitReason">—</b></div>
   </div>
  </div>
- <p class="note">測試版暫不計入手續費、期交稅與滑價；損益先以點數顯示。停損／停利依每根 K 線 OHLC 模擬觸發，同根同時觸及時採停損優先。一次只允許一筆持倉，不支援加碼或反手。</p>
+ <p class="note">淨損益已計入每邊手續費、雙邊期交稅及設定滑價。市價進出場與停損／強制平倉採不利滑價；停利視為限價單，觸價依停利價成交，跳空有利時依開盤價成交，不額外加不利滑價。一次只允許一筆持倉，不支援加碼或反手。</p>
 </section>
 <section class="panel">
  <b>選擇訓練場次</b>
@@ -131,7 +131,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
 </section>
 <section class="panel">
  <b>版本說明與限制</b>
- <p class="note">目前為市價單測試版：每次固定 1 口，送單後於下一根已揭露 K 線的開盤價成交；可設定停損與停利距離。回放依時間連續跨日期與盤別，持倉不因跨日清空。暫不計手續費、期交稅與滑價；主畫面保留最近一筆完整交易，詳細行為紀錄請使用獨立頁面。</p>
+ <p class="note">目前為市價單測試版：每次固定 1 口，送單後於下一根已揭露 K 線的開盤價成交；可設定停損與停利距離。回放依時間連續跨日期與盤別，持倉不因跨日清空。淨損益計入可調手續費、期交稅及滑價；主畫面保留最近一筆完整交易，詳細行為紀錄請使用獨立頁面。</p>
  <p class="note">資料來源：使用者提供的 TMFR1 5 分鐘 CSV。若資料缺少時段，回放會保留實際時間順序，不會補造 K 線。</p>
 </section>
 </main>
@@ -156,7 +156,7 @@ function loadAccount(){
 let account=loadAccount(),marginLiquidationPending=false;
 const money=n=>"NT$"+Math.round(n).toLocaleString("zh-TW");
 function saveAccount(){localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));}
-function accountUnrealized(){const last=revealed?bars[revealed-1]:null;return position&&last?(last.c-position.entry)*(position.side==="多"?1:-1)*10:0;}
+function accountUnrealized(){const last=revealed?bars[revealed-1]:null;if(!position||!last)return 0;const mark=adverseFill(last.c,position.side,last),gross=(mark-position.entry)*(position.side==="多"?1:-1)*10,c=costSettings(),tax=(position.entry+mark)*10*0.00002,commission=2*c.commission_per_side;return gross-tax-commission;}
 function accountMetrics(){const qty=position?1:0,u=accountUnrealized(),equity=account.balance+u;return {qty,u,equity,initialUsed:account.initial_margin_per_contract*qty,maintenance:account.maintenance_margin_per_contract*qty,available:equity-account.initial_margin_per_contract*qty};}
 function renderAccount(){
  renderCostSettings();
@@ -172,7 +172,7 @@ function depositFunds(){const raw=$("depositAmount").value.trim(),amount=Number(
 function saveMarginSettings(){const initial=Number($("initialMarginInput").value),maintenance=Number($("maintenanceMarginInput").value);if(!Number.isSafeInteger(initial)||!Number.isSafeInteger(maintenance)||initial<=0||maintenance<=0||initial<maintenance){$("marginStatus").textContent="保證金參數無效：原始保證金與維持保證金須為正整數，且原始不得低於維持。";return;}account.initial_margin_per_contract=initial;account.maintenance_margin_per_contract=maintenance;saveAccount();renderAccount();$("marginStatus").textContent="保證金參數已保存。";}
 function costSettings(){if(!account.costs)account.costs={commission_per_side:0,base_slippage:0,range_slippage:0,low_volume_penalty:0,dynamic_slippage:false};return account.costs;}
 function saveCostSettings(){const vals={commission_per_side:Number($("commissionPerSide").value),base_slippage:Number($("baseSlippage").value),range_slippage:Number($("rangeSlippage").value),low_volume_penalty:Number($("lowVolumePenalty").value)};if(Object.values(vals).some(v=>!Number.isFinite(v)||v<0)||vals.range_slippage>1){$("marginStatus").textContent="成本參數無效：請輸入非負數，振幅係數不得超過 1。";return;}account.costs={...vals,dynamic_slippage:$("dynamicSlippage").checked};saveAccount();$("marginStatus").textContent="交易成本設定已保存。";}
-function renderCostSettings(){const c=costSettings();$("commissionPerSide").value=c.commission_per_side;$("baseSlippage").value=c.base_slippage;$("rangeSlippage").value=c.range_slippage;$("lowVolumePenalty").value=c.low_volume_penalty;$("dynamicSlippage").checked=!!c.dynamic_slippage;}
+function renderCostSettings(){const c=costSettings();for(const [id,key] of [["commissionPerSide","commission_per_side"],["baseSlippage","base_slippage"],["rangeSlippage","range_slippage"],["lowVolumePenalty","low_volume_penalty"]]){const el=$(id);if(document.activeElement!==el)el.value=c[key];}const toggle=$("dynamicSlippage");if(document.activeElement!==toggle)toggle.checked=!!c.dynamic_slippage;}
 function estimatedSlippage(bar){const c=costSettings();if(!c.dynamic_slippage)return c.base_slippage;const idx=bars.findIndex(x=>x.t===bar.t),prior=bars.slice(Math.max(0,idx-20),idx).map(x=>x.v).filter(v=>Number.isFinite(v)&&v>0).sort((a,b)=>a-b);const median=prior.length?prior[Math.floor(prior.length/2)]:0;return c.base_slippage+Math.max(0,bar.h-bar.l)*c.range_slippage+(median>0&&bar.v<median*0.5?c.low_volume_penalty:0);}
 function adverseFill(price,side,bar){const slip=estimatedSlippage(bar);return price+(side==="多"?-slip:slip);}
 function checkMargin(){if(!position||marginLiquidationPending||!account.maintenance_margin_per_contract)return;const m=accountMetrics();if(m.equity<m.maintenance){marginLiquidationPending=true;$("orderStatus").textContent="帳戶權益低於維持保證金，已排定下一根 K 線開盤強制平倉。";renderAccount();}}
@@ -225,7 +225,7 @@ function readDistance(id){
  if(!Number.isFinite(value)||value<=0)throw new Error('停損／停利距離必須是大於 0 的有限數字，或留空不設定。');
  return value;
 }
-function saveSimulationTrade(closed,fill,time,reason,pts){
+function saveSimulationTrade(closed,fill,time,reason,pts,costBreakdown={}){
  const key="tmf.behaviourJournal."+SIM_MODE+".v1",legacyKey="tmf.behaviourJournal.v1";
   let saved=JSON.parse(localStorage.getItem(key)||"null");
   if(!saved&&SIM_MODE==="practice"){saved=JSON.parse(localStorage.getItem(legacyKey)||'{"version":1,"events":[]}');localStorage.setItem(key,JSON.stringify(saved));}
@@ -236,7 +236,7 @@ function saveSimulationTrade(closed,fill,time,reason,pts){
  const from=Math.max(0,Math.min(entryIndex,exitIndex)-30),to=Math.min(bars.length,Math.max(entryIndex,exitIndex)+31);
  const snapshotBars=bars.slice(from,to).map(b=>({timestamp:new Date(b.t).toISOString(),open:b.o,high:b.h,low:b.l,close:b.c,volume:Number.isFinite(b.v)?b.v:0}));
  const iso=t=>new Date(t).toISOString(),tradeId="sim_"+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
- const title="盤感回放 "+closed.side+"單 · "+iso(closed.entryTime).slice(0,10),common={simulation_source:"tmf_simulator",side:closed.side,entry_price:closed.entry,exit_price:fill,realized_points:pts,exit_reason:reason,stop_history:closed.stopHistory||[],target_history:closed.targetHistory||[]};
+ const title="盤感回放 "+closed.side+"單 · "+iso(closed.entryTime).slice(0,10),common={simulation_source:"tmf_simulator",side:closed.side,entry_price:closed.entry,exit_price:fill,realized_points:pts,exit_reason:reason,cost_breakdown:costBreakdown,stop_history:closed.stopHistory||[],target_history:closed.targetHistory||[]};
  const replay_snapshot={timeframe:"5 分鐘",bars:snapshotBars,entry_timestamp:iso(closed.entryTime),exit_timestamp:iso(time)};
  saved.events.push(
   {entry_id:"jrn_"+tradeId+"_entry",event_type:"entry",recorded_at:new Date().toISOString(),market_timestamp:iso(closed.entryTime),trade_id:tradeId,narrative:"盤感回放自動紀錄：進場 "+closed.side+"單 @ "+closed.entry,context:{...common,title,replay_snapshot},attachments:[]},
@@ -270,13 +270,15 @@ function applyManagedTarget(){
  $('managementStatus').textContent='停利已更新：'+(old===null?'首次設定':old.toLocaleString('en-US')+' →')+' '+next.toLocaleString('en-US')+'。' ;
  $('managedTargetPrice').value='';updateTradeUI();
 }
-function finishPosition(fill,time,reason){
+function finishPosition(fill,time,reason,execution='market'){
  if(!position)return;
- const closed=position,exitBar=bars.find(x=>x.t===time),actualFill=exitBar?adverseFill(fill,closed.side,exitBar):fill,pts=(actualFill-closed.entry)*(closed.side==='多'?1:-1);
+ const closed=position,exitBar=bars.find(x=>x.t===time),actualFill=exitBar&&execution==='market'?adverseFill(fill,closed.side,exitBar):fill,pts=(actualFill-closed.entry)*(closed.side==='多'?1:-1);
  const c=costSettings(),commission=2*c.commission_per_side,tax=(closed.entry+actualFill)*10*0.00002,totalCost=commission+tax,netTwd=pts*10-totalCost,netPoints=netTwd/10;
+ const entryBar=bars.find(x=>x.t===closed.entryTime),entrySlippage=entryBar?Math.abs(closed.entry-entryBar.o):0,exitSlippage=execution==='market'&&exitBar?Math.abs(actualFill-fill):0;
  realizedPoints+=netPoints;account.balance+=netTwd;addAccountLedger('realized_pnl',netTwd,'模擬交易淨損益（已扣手續費、期交稅及滑價）');
- lastTrade={side:closed.side,entryTime:closed.entryTime,entry:closed.entry,exitTime:time,exit:actualFill,points:netPoints,grossPoints:pts,commission:commission,tax:tax,exitReason:reason};
- try{saveSimulationTrade(closed,actualFill,time,reason,netPoints);}
+ const tradeCosts={gross_points:pts,net_points:netPoints,net_twd:netTwd,commission_twd:commission,futures_tax_twd:tax,entry_slippage_points:entrySlippage,exit_slippage_points:exitSlippage,exit_execution:execution};
+ lastTrade={side:closed.side,entryTime:closed.entryTime,entry:closed.entry,exitTime:time,exit:actualFill,points:netPoints,grossPoints:pts,commission:commission,tax:tax,exitReason:reason,...tradeCosts};
+ try{saveSimulationTrade(closed,actualFill,time,reason,netPoints,tradeCosts);}
  catch(err){$('orderStatus').textContent+='｜交易歷史保存失敗：'+err.message;}
  $('orderStatus').textContent=`${closed.side}單已出場（${reason}）｜進場 ${closed.entryTime} @ ${closed.entry.toLocaleString('en-US')}｜出場 ${time} @ ${actualFill.toLocaleString('en-US')}｜淨損益 ${netPoints>=0?'+':''}${netPoints.toFixed(1)} 點`;
  position=null;
@@ -287,11 +289,11 @@ function evaluateStops(bar){
  const stopGap=p.stopLoss!==null&&(long?bar.o<=p.stopLoss:bar.o>=p.stopLoss);
  const targetGap=p.takeProfit!==null&&(long?bar.o>=p.takeProfit:bar.o<=p.takeProfit);
  if(stopGap){finishPosition(bar.o,bar.t,'跳空停損');return}
- if(targetGap){finishPosition(bar.o,bar.t,'跳空停利');return}
+ if(targetGap){finishPosition(bar.o,bar.t,'跳空停利','limit');return}
  const stopHit=p.stopLoss!==null&&(long?bar.l<=p.stopLoss:bar.h>=p.stopLoss);
  const targetHit=p.takeProfit!==null&&(long?bar.h>=p.takeProfit:bar.l<=p.takeProfit);
  if(stopHit){finishPosition(p.stopLoss,bar.t,stopHit&&targetHit?'同根觸及停損停利，保守採停損':'停損');return}
- if(targetHit){finishPosition(p.takeProfit,bar.t,'停利');}
+ if(targetHit){finishPosition(p.takeProfit,bar.t,'停利','limit');}
 }
 function placeMarketOrder(type){
  if(pendingOrder){$('orderStatus').textContent='已有一筆待成交委託，請先等待下一根 K 線。';return}
