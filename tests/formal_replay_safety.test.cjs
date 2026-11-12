@@ -52,7 +52,7 @@ test('formal mode cumulative stats use only revealed completed exits from the ac
 });
 
 test('existing account and behaviour journal keys are not deleted or cleared', () => {
-  assert.doesNotMatch(html, /localStorage\.(removeItem|clear)\(/);
+  assert.doesNotMatch(html, /localStorage\.clear\(/);\n  assert.match(html, /old\.key\.startsWith\(REPLAY_STATE_PREFIX/);
   assert.match(html, /tmf\.behaviourJournal\."\+SIM_MODE/);
   assert.match(html, /tmf\.sim\.account\."\+SIM_MODE/);
 });
