@@ -517,7 +517,7 @@ function replayStatePayload(){
 }
 function validateReplayState(s){
  if(!s||s.schema!==1||s.mode!==SIM_MODE||s.datasetId!==replayDatasetId||
-    typeof s.session!=="string"||s.replayMode!==$("replayMode").value&&s.session===replayStartDate||
+    typeof s.session!=="string"||!["day","night"].includes(s.replayMode)||
     !Number.isInteger(s.revealed)||s.revealed<1||s.revealed>bars.length||
     !Number.isInteger(s.selectedIndex)||s.selectedIndex<0||s.selectedIndex>=s.revealed||
     !Number.isInteger(s.viewStart)||s.viewStart<0||s.viewStart>=s.revealed||
