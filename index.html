@@ -139,7 +139,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
 </section>
 <section class="panel" id="replaySafetyPanel">
  <b>回放保存與風控狀態</b>
- <div class="row" style="margin-top:8px"><button id="saveReplayNow" class="primary">立即保存</button><button id="restoreReplayBackup">檢查備份</button></div>
+ <div class="row" style="margin-top:8px"><button id="saveReplayNow" class="primary">立即保存</button><button id="restoreReplayBackup">檢查／恢復備份</button></div><div class="row" style="margin-top:8px"><button id="exportReplayBackups">匯出備份檔</button><button id="importReplayBackups">匯入備份檔</button><input id="replayBackupFile" type="file" accept="application/json,.json" hidden></div>
  <p class="note" id="replaySaveStatus">尚未建立回放備份。</p>
  <div class="stats"><div class="stat"><small>當日虧損上限</small><b>4%（當日初始權益）</b></div><div class="stat"><small>連續虧損提醒</small><b>5／9／12 次</b></div><div class="stat"><small>新增交易狀態</small><b id="riskGateStatus">正常</b></div></div>
  <p class="note" id="riskStatus">風控紀錄會隨每根 K 線與交易事件保存。達到每日虧損或連續虧損上限時，禁止新增進場並取消未成交進場單；既有持倉與停損停利保留。</p>
@@ -680,6 +680,41 @@ $("restoreReplayBackup").onclick=()=>{
   saveReplayState(false);
   restoreReplayState(selected.session,selected.replayMode,selected.key);
  }
+};
+$("exportReplayBackups").onclick=()=>{
+ const prefix=REPLAY_STATE_PREFIX+replayDatasetId+".";
+ const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]");
+ const backups=index.filter(x=>x.key.startsWith(prefix)&&x.session===replayStartDate&&x.replayMode===replayStartMode)
+  .map(x=>({key:x.key,meta:x,snapshot:JSON.parse(localStorage.getItem(x.key)||"null")}))
+  .filter(x=>validateReplayState(x.snapshot));
+ if(!backups.length){alert("目前場次沒有有效備份可匯出。");return;}
+ const payload={schema:1,mode:SIM_MODE,datasetId:replayDatasetId,session:replayStartDate,replayMode:replayStartMode,exportedAt:new Date().toISOString(),backups};
+ const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+ const url=URL.createObjectURL(blob),a=document.createElement("a");
+ a.href=url;a.download="tmf-replay-backup-"+replayDatasetId+"-"+replayStartDate+".json";
+ document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+ $("replaySaveStatus").textContent="備份檔已匯出："+backups.length+" 個有效版本。可另存至 iCloud Drive 或其他雲端空間。";
+};
+$("importReplayBackups").onclick=()=>$("replayBackupFile").click();
+$("replayBackupFile").onchange=async()=>{
+ const file=$("replayBackupFile").files?.[0];if(!file)return;
+ try{
+  const payload=JSON.parse(await file.text());
+  if(payload.schema!==1||payload.mode!==SIM_MODE||payload.datasetId!==replayDatasetId||payload.session!==replayStartDate||payload.replayMode!==replayStartMode||!Array.isArray(payload.backups))throw new Error("備份檔與目前模式、資料集或場次不一致。");
+  const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]"),added=[];
+  for(const item of payload.backups){
+   if(!item||!item.snapshot||!validateReplayState(item.snapshot)||item.snapshot.session!==replayStartDate||item.snapshot.replayMode!==replayStartMode)continue;
+   const key=item.snapshot.key;
+   if(typeof key!=="string"||!key.startsWith(REPLAY_STATE_PREFIX+replayDatasetId+"."))continue;
+   localStorage.setItem(key,JSON.stringify(item.snapshot));
+   added.push({key,savedAt:item.snapshot.savedAt,bytes:JSON.stringify(item.snapshot).length,session:item.snapshot.session,replayMode:item.snapshot.replayMode});
+  }
+  if(!added.length)throw new Error("檔案內沒有可通過完整性驗證的備份版本。");
+  const merged=[...added,...index].filter((x,i,a)=>a.findIndex(y=>y.key===x.key&&y.savedAt===x.savedAt)===i).slice(0,60);
+  localStorage.setItem(REPLAY_BACKUP_INDEX,JSON.stringify(merged));
+  $("replaySaveStatus").textContent="已匯入 "+added.length+" 個有效備份版本；原有交易紀錄未變更。";
+ }catch(err){$("replaySaveStatus").textContent="匯入失敗，原有備份未覆蓋："+err.message;}
+ finally{$("replayBackupFile").value="";}
 };
 document.addEventListener("visibilitychange",()=>{if(document.hidden){stop();saveReplayState(false);}});
 window.addEventListener("pagehide",()=>{stop();saveReplayState(false);});
