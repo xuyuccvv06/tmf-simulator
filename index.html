@@ -778,6 +778,9 @@ step=function(){
  if(current&&replayRisk.tradingDate===current.d){
   const equity=accountMetrics().equity;
   replayRisk.dayNet=equity-replayRisk.dayStartEquity;
+  replayRisk.dayPeakNet=Math.max(replayRisk.dayPeakNet||0,replayRisk.dayNet);
+  replayRisk.profitGiveback=Math.max(0,replayRisk.dayPeakNet-replayRisk.dayNet);
+  replayRisk.maxProfitGiveback=Math.max(replayRisk.maxProfitGiveback||0,replayRisk.profitGiveback);
   if(replayRisk.dayNet<=-Math.abs(replayRisk.dayStartEquity)*0.04){
    replayRisk.blockedDate=current.d;
    if(!replayRisk.blockReasons.includes("daily_loss_4pct"))replayRisk.blockReasons.push("daily_loss_4pct");
