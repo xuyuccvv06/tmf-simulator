@@ -236,7 +236,7 @@ function saveSimulationTrade(closed,fill,time,reason,pts,costBreakdown={}){
  const from=Math.max(0,Math.min(entryIndex,exitIndex)-30),to=Math.min(bars.length,Math.max(entryIndex,exitIndex)+31);
  const snapshotBars=bars.slice(from,to).map(b=>({timestamp:new Date(b.t).toISOString(),open:b.o,high:b.h,low:b.l,close:b.c,volume:Number.isFinite(b.v)?b.v:0}));
  const iso=t=>new Date(t).toISOString(),tradeId="sim_"+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
- const title="盤感回放 "+closed.side+"單 · "+iso(closed.entryTime).slice(0,10),common={simulation_source:"tmf_simulator",side:closed.side,entry_price:closed.entry,exit_price:fill,realized_points:pts,exit_reason:reason,cost_breakdown:costBreakdown,stop_history:closed.stopHistory||[],target_history:closed.targetHistory||[]};
+ const title="盤感回放 "+closed.side+"單 · "+iso(closed.entryTime).slice(0,10),common={simulation_source:"tmf_simulator",side:closed.side,entry_price:closed.entry,exit_price:fill,realized_points:pts,realized_pnl_twd:Number.isFinite(costBreakdown.net_twd)?costBreakdown.net_twd:null,cost_breakdown:costBreakdown,exit_reason:reason,stop_history:closed.stopHistory||[],target_history:closed.targetHistory||[]};
  const replay_snapshot={timeframe:"5 分鐘",bars:snapshotBars,entry_timestamp:iso(closed.entryTime),exit_timestamp:iso(time)};
  saved.events.push(
   {entry_id:"jrn_"+tradeId+"_entry",event_type:"entry",recorded_at:new Date().toISOString(),market_timestamp:iso(closed.entryTime),trade_id:tradeId,narrative:"盤感回放自動紀錄：進場 "+closed.side+"單 @ "+closed.entry,context:{...common,title,replay_snapshot},attachments:[]},
