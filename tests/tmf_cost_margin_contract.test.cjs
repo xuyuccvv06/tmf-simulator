@@ -58,7 +58,9 @@ test('TMF official margin history is ordered, bounded and contains all three mar
   assert.equal(margins.contract, 'TMF');
   assert.equal(margins.period_start, '2024-07-29');
   assert.equal(margins.period_end, '2025-12-31');
-  assert.ok(margins.records.length >= 14);
+  assert.ok(margins.records.length >= 16);
+  assert.ok(margins.records.some(r => r.effective_date === '2025-01-22' && r.initial === 17700));
+  assert.ok(margins.records.some(r => r.effective_date === '2025-02-06' && r.initial === 16100));
   const dates = margins.records.map(r => r.effective_date);
   assert.deepEqual(dates, [...dates].sort());
   for (const row of margins.records) {
