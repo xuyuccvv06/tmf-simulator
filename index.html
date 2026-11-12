@@ -145,7 +145,15 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
  <p class="note" id="riskStatus">風控紀錄會隨每根 K 線與交易事件保存。達到每日虧損或連續虧損上限時，禁止新增進場並取消未成交進場單；既有持倉與停損停利保留。</p>
 </section>
 <section class="panel">
- <b>選擇訓練場次</b>
+ <b>資料集與訓練場次</b>
+ <div class="row" style="margin-top:10px">
+  <select id="datasetSelector" style="flex:1;min-width:180px"></select>
+ </div>
+ <div class="row" style="margin-top:8px">
+  <input id="datasetUploadFile" type="file" accept=".csv,text/csv" style="flex:1;min-width:180px">
+  <button id="importReplayDataset">匯入 CSV</button>
+ </div>
+ <p class="note" id="datasetStatus">每個 CSV 資料集會依 SHA-256 指紋獨立保存回放進度、帳戶、持倉、委託與交易紀錄。</p>
  <div class="row" style="margin-top:10px">
   <select id="session" style="flex:1;min-width:180px"></select><button id="newSession">隨機選一天</button>
  </div>
