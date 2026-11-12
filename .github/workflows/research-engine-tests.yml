@@ -36,6 +36,8 @@ jobs:
           done
       - name: Test trade journal statistics and audit behavior
         run: node --test tests/trade_journal_stats.test.cjs
+      - name: Test practice and formal mode isolation
+        run: node --test tests/simulator_mode_isolation.test.cjs
       - name: Profile checked-in TMFR1 CSV (read-only)
         if: hashFiles('TMFR1_5min_2024-2025.csv') != ''
         run: python scripts/profile_csv.py TMFR1_5min_2024-2025.csv > tmfr1_csv_profile.json
