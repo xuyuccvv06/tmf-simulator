@@ -769,7 +769,8 @@ step=function(){
  const pendingBeforeStep=pendingOrder;
  const nextBar=bars[revealed],nextDate=nextBar?.d||null;
  if(nextDate&&replayRisk.tradingDate!==nextDate){
-  replayRisk={tradingDate:nextDate,dayStartEquity:accountMetrics().equity,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+  applyHistoricalMarginForReplayDate(nextDate);
+  replayRisk={tradingDate:nextDate,dayStartEquity:accountMetrics().equity,dayNet:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[]};
  }
  originalStepForState();
  const current=bars[Math.max(0,revealed-1)];
