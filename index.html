@@ -524,14 +524,35 @@ function listReplayBackups(){
   return valid;
  }catch(err){$("replaySaveStatus").textContent="備份索引讀取失敗："+err.message;return [];}
 }
+function datasetAccountKey(date,mode){
+ return "tmf.sim.account.dataset."+SIM_MODE+".v1."+date+"."+mode;
+}
+saveAccount=function(){
+ const date=replayStartDate||$("session").value,mode=replayStartMode||$("replayMode").value;
+ localStorage.setItem(datasetAccountKey(date,mode),JSON.stringify(account));
+};
 const originalLoadDateForState=loadDate;
 loadDate=function(date){
- if(replayStateReady)saveReplayState(false);
+ const requestedMode=$("replayMode").value;
+ if(replayStateReady){
+  saveReplayState(false);
+  saveAccount();
+ }
  originalLoadDateForState(date);
- replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
- const restored=restoreReplayState(date,$("replayMode").value);
+ // loadDate may be cancelled by its existing confirmation dialog.
+ if(replayStartDate!==date||replayStartMode!==requestedMode)return;
+ const restored=restoreReplayState(date,requestedMode);
+ if(!restored){
+  try{
+   const saved=JSON.parse(localStorage.getItem(datasetAccountKey(date,requestedMode))||"null");
+   account=saved&&saved.version===1&&Number.isFinite(saved.balance)&&Array.isArray(saved.ledger)?saved:freshAccount();
+  }catch{account=freshAccount();}
+  saveAccount();
+  replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+  render();updateTradeUI();
+  saveReplayState(false);
+ }
  replayStateReady=true;
- if(!restored)saveReplayState(false);
 };
 const originalStepForState=step;
 step=function(){
