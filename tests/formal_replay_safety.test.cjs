@@ -61,6 +61,20 @@ test('margin calls persist to the next trading-day noon and are included in snap
   assert.match(html, /account,marginLiquidationPending,marginCall,replayRisk/);
 });
 
+test('formal test requires a locked configuration and seals the append-only decision log at completion', () => {
+  assert.match(html, /function lockFormalRun\(\)/);
+  assert.match(html, /replayStartDate!=="2024-07-29"/);
+  assert.match(html, /commission_per_side:10,base_slippage:1,range_slippage:0,low_volume_penalty:0,dynamic_slippage:false/);
+  assert.match(html, /function recordFormalDecision\(eventType,details=\{\}\)/);
+  assert.match(html, /function sealFormalDecisionLog\(\)/);
+  assert.match(html, /formalRunLock\.completedAt/);
+  assert.match(html, /正式盲測已完成並封存/);
+  assert.match(html, /recordFormalDecision\("entry_order_submitted"/);
+  assert.match(html, /recordFormalDecision\("entry_order_filled"/);
+  assert.match(html, /recordFormalDecision\("entry_order_expired"/);
+  assert.match(html, /if\(revealed>=bars\.length\)sealFormalDecisionLog\(\)/);
+});
+
 test('formal mode cumulative stats use only revealed completed exits from the active dataset', () => {
   assert.match(html, /formalPerformancePanel/);
   assert.match(html, /replay_dataset_id:replayDatasetId/);
