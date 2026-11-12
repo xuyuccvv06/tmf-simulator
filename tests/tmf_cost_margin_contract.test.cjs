@@ -85,3 +85,9 @@ test('historical margin apply is explicit and does not overwrite settings on pag
   assert.match(html, /loadHistoricalMarginData\(\)/);
   assert.match(html, /function saveMarginSettings\(\)/);
 });
+
+test('historical margin lookup is loaded and both controls are wired', () => {
+  assert.match(html, /\$\("lookupHistoricalMargin"\)\.onclick=lookupHistoricalMargin/);
+  assert.match(html, /\$\("applyHistoricalMargin"\)\.onclick=applyHistoricalMargin/);
+  assert.match(html, /\nloadHistoricalMarginData\(\);\ninit\(\);/);
+});
