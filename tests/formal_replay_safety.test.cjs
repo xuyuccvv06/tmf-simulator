@@ -46,7 +46,7 @@ test('limit entries only evaluate the next revealed bar and expire after a miss'
 });
 
 test('daily 4 percent loss and 5/9/12 loss warnings enforce the entry gate', () => {
-  assert.match(html, /dayStartEquity\)\*0\.04/);
+  assert.match(html, /dayStartEquity\)\*0\.04/);\n  assert.match(html, /equity-replayRisk\.dayStartEquity-\(replayRisk\.dayDeposits\|\|0\)/);
   assert.match(html, /replayRisk\.lossStreak>=5/);
   assert.match(html, /replayRisk\.lossStreak>=9/);
   assert.match(html, /replayRisk\.lossStreak>=12/);
