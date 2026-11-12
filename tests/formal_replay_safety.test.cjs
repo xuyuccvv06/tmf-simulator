@@ -82,6 +82,12 @@ test('formal mode cumulative stats use only revealed completed exits from the ac
   assert.match(html, /e\.context\?\.replay_dataset_id===replayDatasetId/);
 });
 
+test('portable backups include formal decision audit and lock metadata', () => {
+  assert.match(html, /formalDecisionLog,formalRunLock/);
+  assert.match(html, /incoming\.checksum===formalDecisionChecksum\(incoming\.events\)/);
+  assert.match(html, /payload\.formalRunLock\.startDate===replayStartDate/);
+});
+
 test('portable backup import preserves an existing valid snapshot instead of overwriting it', () => {
   assert.match(html, /const existingRaw=localStorage\.getItem\(key\)/);
   assert.match(html, /existing\.checksum===snapshot\.checksum/);
