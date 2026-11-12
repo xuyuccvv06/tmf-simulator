@@ -568,16 +568,17 @@ step=function(){
   if(replayRisk.dayNet<=-Math.abs(replayRisk.dayStartEquity)*0.04){
    replayRisk.blockedDate=current.d;
    if(!replayRisk.blockReasons.includes("daily_loss_4pct"))replayRisk.blockReasons.push("daily_loss_4pct");
-   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type))pendingOrder=null;
+   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){pendingOrder=null;updateTradeUI();}
   }
   if(replayRisk.lossStreak>=12){
    replayRisk.blockedDate=current.d;
    if(!replayRisk.blockReasons.includes("loss_streak_12"))replayRisk.blockReasons.push("loss_streak_12");
-   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type))pendingOrder=null;
+   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){pendingOrder=null;updateTradeUI();}
   }
   const gate=$("riskGateStatus"),status=$("riskStatus");
-  if(gate)gate.textContent=replayRisk.blockedDate===current.d?"已封鎖新增進場":replayRisk.lossStreak>=9?"連虧警戒":"正常";
-  if(status)status.textContent="交易日 "+current.d+"｜當日損益 "+Math.round(replayRisk.dayNet).toLocaleString("zh-TW")+" 元｜連續虧損 "+replayRisk.lossStreak+" 次｜觸發："+(replayRisk.blockReasons.join("、")||"無");
+  const warning=replayRisk.lossStreak>=12?"已封鎖新增進場":replayRisk.lossStreak>=9?"高風險警告":replayRisk.lossStreak>=5?"連虧提醒":"正常";
+  if(gate)gate.textContent=replayRisk.blockedDate===current.d?"已封鎖新增進場":warning;
+  if(status)status.textContent="交易日 "+current.d+"｜當日損益 "+Math.round(replayRisk.dayNet).toLocaleString("zh-TW")+" 元｜連續虧損 "+replayRisk.lossStreak+" 次｜"+warning+"｜觸發："+(replayRisk.blockReasons.join("、")||"無");
  }
  saveReplayState(false);
 };
