@@ -168,7 +168,7 @@ let position=null, pendingOrder=null, realizedPoints=0, lastTrade=null;
 const MODE_PARAM=new URLSearchParams(location.search).get("mode"),SIM_MODE=MODE_PARAM==="formal"?"formal":"practice";
 const MODE_LABEL=SIM_MODE==="formal"?"正式盤感測試":"練習模式";
 const ACCOUNT_KEY="tmf.sim.account."+SIM_MODE+".v1",LEGACY_ACCOUNT_KEY="tmf.sim.account.v1";
-function freshAccount(){return {version:1,balance:50000,initial_margin_per_contract:0,maintenance_margin_per_contract:0,costs:{commission_per_side:0,base_slippage:0,range_slippage:0,low_volume_penalty:0,dynamic_slippage:false},ledger:[{type:"initial_capital",amount:50000,recorded_at:new Date().toISOString(),note:MODE_LABEL+"初始資金"}]};}
+function freshAccount(){return {version:1,balance:50000,initial_margin_per_contract:0,maintenance_margin_per_contract:0,costs:{commission_per_side:10,base_slippage:1,range_slippage:0,low_volume_penalty:0,dynamic_slippage:false},ledger:[{type:"initial_capital",amount:50000,recorded_at:new Date().toISOString(),note:MODE_LABEL+"初始資金"}]};}
 function loadAccount(){
  try{
   const current=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||"null");
