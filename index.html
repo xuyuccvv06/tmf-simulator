@@ -562,7 +562,7 @@ function saveReplayState(manual=false){
 }
 function restoreReplayState(date,mode){
  const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]");
- const key=arguments.length>2?arguments[2]:(index.find(x=>x.session===date&&x.replayMode===mode)?.key||replayStateKey(date,mode));
+ const key=arguments.length>2?arguments[2]:(index.find(x=>x.session===date&&x.replayMode===mode&&typeof x.key==="string"&&x.key.startsWith(REPLAY_STATE_PREFIX+replayDatasetId+"."))?.key||replayStateKey(date,mode));
  try{
   const raw=localStorage.getItem(key);if(!raw)return false;
   const s=JSON.parse(raw);
@@ -583,7 +583,7 @@ function restoreReplayState(date,mode){
 function listReplayBackups(){
  try{
   const rows=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]");
-  const valid=rows.filter(x=>{try{const s=JSON.parse(localStorage.getItem(x.key)||"null");return validateReplayState(s)&&s.savedAt===x.savedAt;}catch{return false;}});
+  const valid=rows.filter(x=>{try{const s=JSON.parse(localStorage.getItem(x.key)||"null");return x.session===replayStartDate&&x.replayMode===replayStartMode&&validateReplayState(s)&&s.savedAt===x.savedAt;}catch{return false;}});
   $("replaySaveStatus").textContent="備份檢查完成："+valid.length+" 個有效版本／"+rows.length+" 個索引紀錄。最新："+(valid[0]?new Date(valid[0].savedAt).toLocaleString("zh-TW"):"無有效備份");
   return valid;
  }catch(err){$("replaySaveStatus").textContent="備份索引讀取失敗："+err.message;return [];}
