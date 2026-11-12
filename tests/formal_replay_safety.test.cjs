@@ -44,6 +44,14 @@ test('daily 4 percent loss and 5/9/12 loss warnings enforce the entry gate', () 
   assert.match(html, /風控已封鎖今日新增進場/);
 });
 
+test('historical margin is loaded before replay and applied by after-close effective date', () => {
+  assert.match(html, /await loadHistoricalMarginData\(\)/);
+  assert.match(html, /function applyHistoricalMarginForReplayDate\(date\)/);
+  assert.match(html, /r\.effective_date<date/);
+  assert.match(html, /account\.initial_margin_per_contract=Number\(row\.initial\)/);
+  assert.match(html, /account\.maintenance_margin_per_contract=Number\(row\.maintenance\)/);
+});
+
 test('margin calls persist to the next trading-day noon and are included in snapshots', () => {
   assert.match(html, /function evaluateMarginCall\(bar\)/);
   assert.match(html, /dates\.find\(d=>d>bar\.d\)/);
