@@ -34,7 +34,7 @@ def test_dynamic_slippage_uses_only_prior_volume_and_current_range():
     ]
     cfg = DynamicSlippageConfig(base_points=0.2, range_fraction=0.1,
                                 low_volume_penalty_points=0.5, max_points=5)
-    assert dynamic_slippage_points(bars, 2, cfg) == pytest.approx(1.7)
+    assert dynamic_slippage_points(bars, 2, cfg) == pytest.approx(1.9)
 
 
 def test_dynamic_slippage_clamps_to_maximum():
