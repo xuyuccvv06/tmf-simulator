@@ -68,6 +68,10 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
   <div><label for="stopLossPoints">停損距離（點，可留空）</label><input id="stopLossPoints" type="number" min="1" step="1" inputmode="numeric" placeholder="不設定"></div>
   <div><label for="takeProfitPoints">停利距離（點，可留空）</label><input id="takeProfitPoints" type="number" min="1" step="1" inputmode="numeric" placeholder="不設定"></div>
  </div>
+ <div class="trade-record" style="margin-top:8px">
+  <div class="full"><label for="limitOrderPrice">限價進場價格（整數點）</label><input id="limitOrderPrice" type="number" step="1" inputmode="numeric" placeholder="輸入限價價格"></div>
+  <div class="row full"><button id="limitBuy">限價做多</button><button id="limitSell">限價做空</button></div>
+ </div>
  <div class="row" style="margin-top:10px">
   <button id="buy" class="primary">市價做多</button>
   <button id="sell" style="background:#71363a;border-color:#9a4b50">市價做空</button>
@@ -407,6 +411,48 @@ $('cursorLatest').onclick=()=>{selectedIndex=Math.max(0,revealed-1);$('barCursor
 $('buy').onclick=()=>placeMarketOrder('buy');$('sell').onclick=()=>placeMarketOrder('sell');$('close').onclick=()=>placeMarketOrder('close');
 $('step').onclick=step;$('play').onclick=play;$('applyStop').onclick=applyManagedStop;$('applyTarget').onclick=applyManagedTarget;$('reset').onclick=()=>loadDate($('session').value);$('speed').onchange=()=>{if(timer){stop();play()}};$('visible').onchange=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);if(selectedIndex<viewStart)selectedIndex=viewStart;render()};$('latest').onclick=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);render()};$('session').onchange=()=>loadDate($('session').value);$('replayMode').onchange=()=>loadDate($('session').value);$('newSession').onclick=()=>{const d=dates[Math.floor(Math.random()*dates.length)];$('session').value=d;loadDate(d)};
 async function init(){try{setStatus('正在載入 CSV…');const res=await fetch('./TMFR1_5min_2024-2025.csv');if(!res.ok)throw new Error(`CSV 載入失敗：HTTP ${res.status}`);const rawCsv=await res.text();all=parseCSV(rawCsv);if(!all.length)throw new Error('CSV 沒有可用行情');all.sort((a,b)=>a.t.localeCompare(b.t));let backupSync='';try{const saved=await saveReplayDatasetToJournalDB(rawCsv,all);backupSync=`・完整行情已同步備份（${saved.rowCount.toLocaleString()} 根）`;}catch(syncError){backupSync='・行情備份同步失敗：'+syncError.message;}dates=[...new Set(all.filter(x=>x.t.slice(11,16)>='08:45'&&x.t.slice(11,16)<='13:45').map(x=>x.t.slice(0,10)))].sort();dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;$('session').appendChild(o)});$('session').value=dates[0];loadDate(dates[0]);setStatus(`資料載入完成・${all.length.toLocaleString()} 根${backupSync}`)}catch(e){setStatus('載入失敗');const msg=document.createElement('p');msg.className='note';msg.style.color='#f06468';msg.textContent=e.message+'。請確認 CSV 與 HTML 位於同一個 GitHub Repository 根目錄，並透過 GitHub Pages 網址開啟。';document.querySelector('main').prepend(msg)}}
+
+/* One-bar limit-entry orders: checked only against the next revealed bar, then expire. */
+function placeLimitEntry(side){
+ if(position||pendingOrder){$("orderStatus").textContent="目前已有持倉或待成交委託，請先處理後再送單。";return;}
+ if(revealed>=bars.length){$("orderStatus").textContent="本局已結束，無法送單。";return;}
+ if(replayRisk.blockedDate===(bars[revealed-1]?.d||replayStartDate)){ $("orderStatus").textContent="風控已封鎖今日新增進場。";return;}
+ const raw=$("limitOrderPrice").value.trim(),price=Number(raw);
+ if(!raw||!Number.isSafeInteger(price)){$("orderStatus").textContent="限價必須是整數點位。";return;}
+ try{
+  const stopDistance=readDistance("stopLossPoints"),targetDistance=readDistance("takeProfitPoints");
+  if(account.initial_margin_per_contract>0&&account.balance<account.initial_margin_per_contract){$("orderStatus").textContent="帳戶餘額不足原始保證金，無法建立新倉。";return;}
+  pendingOrder={type:side==="多"?"limitBuy":"limitSell",limitPrice:price,stopDistance,targetDistance,submittedAt:bars[revealed-1]?.t||null,expiresAfterNextBar:true};
+  $("orderStatus").textContent=(side==="多"?"限價做多":"限價做空")+"已送出："+price+" 點；僅下一根 K 線有效，未觸價即取消。";
+  $("limitOrderPrice").value="";
+  updateTradeUI();saveReplayState(false);
+ }catch(err){$("orderStatus").textContent=err.message;}
+}
+function executeLimitEntry(bar,order){
+ const touched=bar.l<=order.limitPrice&&bar.h>=order.limitPrice;
+ if(!touched){$("orderStatus").textContent="限價委託未成交：下一根 K 線未觸及 "+order.limitPrice+"，已自動取消。";pendingOrder=null;updateTradeUI();return;}
+ const side=order.type==="limitBuy"?"多":"空",entry=order.limitPrice;
+ position={side,entry,entryTime:bar.t,stopLoss:order.stopDistance===null?null:snapPrice(entry+(side==="多"?-order.stopDistance:order.stopDistance)),takeProfit:order.targetDistance===null?null:snapPrice(entry+(side==="多"?order.targetDistance:-order.targetDistance)),entry_slippage_breakdown:{base:0,range:0,low_volume:0,total:0},stopHistory:[],targetHistory:[]};
+ if(position.stopLoss!==null)position.stopHistory.push({kind:"stop",old_price:null,new_price:position.stopLoss,market_timestamp:bar.t,recorded_at:new Date().toISOString(),status:"accepted",reason:"限價進場初始停損"});
+ if(position.takeProfit!==null)position.targetHistory.push({kind:"target",old_price:null,new_price:position.takeProfit,market_timestamp:bar.t,recorded_at:new Date().toISOString(),status:"accepted",reason:"限價進場初始停利"});
+ pendingOrder=null;$("orderStatus").textContent=side+"限價單成交："+entry+" 點（"+bar.t+"）；未套用市價滑價。";updateTradeUI();
+}
+const originalExecutePendingForLimit=executePending;
+executePending=function(bar){
+ const order=pendingOrder;
+ if(order&&(order.type==="limitBuy"||order.type==="limitSell")){executeLimitEntry(bar,order);return;}
+ originalExecutePendingForLimit(bar);
+};
+const originalPlaceMarketForRisk=placeMarketOrder;
+placeMarketOrder=function(type){
+ if((type==="buy"||type==="sell")&&replayRisk.blockedDate===(bars[revealed-1]?.d||replayStartDate)){
+  $("orderStatus").textContent="風控已封鎖今日新增進場；仍可管理或平倉既有部位。";return;
+ }
+ originalPlaceMarketForRisk(type);saveReplayState(false);
+};
+$("limitBuy").onclick=()=>placeLimitEntry("多");
+$("limitSell").onclick=()=>placeLimitEntry("空");
+
 $("depositButton").onclick=depositFunds;$("saveMarginSettings").onclick=saveMarginSettings;$("saveCostSettings").onclick=saveCostSettings;$("lookupHistoricalMargin").onclick=lookupHistoricalMargin;$("applyHistoricalMargin").onclick=applyHistoricalMargin;
 $("modeSelector").value=SIM_MODE;
 $("modeSelector").onchange=()=>{if(position||pendingOrder){alert("請先平倉並取消待成交委託，再切換模式，避免持倉狀態遺失。");$("modeSelector").value=SIM_MODE;return;}location.href="./index.html?mode="+$("modeSelector").value;};
