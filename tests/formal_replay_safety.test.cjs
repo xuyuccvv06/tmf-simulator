@@ -15,6 +15,17 @@ test('replay snapshots are isolated by mode, dataset and replay session', () => 
   assert.match(html, /s\.checksum===replayChecksum\(s\)/);
 });
 
+test('multiple CSV datasets are fingerprinted and keep independent replay state', () => {
+  assert.match(html, /id="datasetSelector"/);
+  assert.match(html, /id="datasetUploadFile"/);
+  assert.match(html, /async function loadReplayDatasetFromJournalDB\(datasetId\)/);
+  assert.match(html, /market_timestamp:x\.t,trading_date:x\.d/);
+  assert.match(html, /function selectedDatasetStorageKey\(\)/);
+  assert.match(html, /saveReplayState\(false\);saveAccount\(\);/);
+  assert.match(html, /if\(SIM_MODE==="formal"&&formalRunLock\)/);
+  assert.match(html, /localStorage\.setItem\(selectedDatasetStorageKey\(\),datasetId\)/);
+});
+
 test('manual save, rolling versions, recovery selection and pause lifecycle are wired', () => {
   assert.match(html, /id="saveReplayNow"/);
   assert.match(html, /id="restoreReplayBackup"/);
