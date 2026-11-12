@@ -53,7 +53,16 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
   <button id="cursorLatest" type="button" style="flex:none">最新</button>
  </div>
  <div class="note" style="margin-top:8px">可拖曳滑桿或點擊圖表上的 K 線移動十字線，查看該根 K 線的時間、開盤、最高、最低、收盤。只允許選取已揭露的 K 線。</div>
- <button id="latest" type="button" style="margin-top:8px;flex:none">回到最新 K 線</button>
+ <div class="row" style="margin-top:10px;gap:6px">
+  <button id="latest" type="button">回到最新 K 線</button>
+  <button id="step" class="primary">下一根 K</button>
+  <button id="play">▶ 播放</button>
+  <button id="reset">重新開始</button>
+ </div>
+ <div class="row" style="margin-top:8px">
+  <label for="speed">播放速度</label><select id="speed"><option value="1500">慢速</option><option value="800" selected>正常</option><option value="300">快速</option><option value="100">極速</option></select>
+  <label for="visible">顯示根數</label><select id="visible"><option>30</option><option>50</option><option>80</option><option>120</option></select>
+ </div>
  <div class="stat" style="margin-top:12px"><small>下單前設定</small><b>進場前設定停損／停利距離</b></div>
  <div class="trade-record" style="margin-top:8px">
   <div><label for="stopLossPoints">停損距離（點，可留空）</label><input id="stopLossPoints" type="number" min="0" step="0.1" inputmode="decimal" placeholder="不設定"></div>
@@ -74,16 +83,6 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
  </div>
  <p class="note" style="margin-top:8px">開倉前可設定停損／停利距離；成交後可在持倉管理區直接輸入價格。停損只能往獲利方向移動，不可放寬；停利可調整。若同一根 K 線同時觸及兩者，採停損優先；開盤跳空越過觸發價，按開盤價模擬成交。</p>
 
-</section>
-<section class="panel">
- <b>回放控制</b>
- <div class="row" style="margin-top:10px">
-  <button id="step" class="primary">下一根 K</button><button id="play">▶ 播放</button><button id="reset">重新開始</button>
- </div>
- <div class="row" style="margin-top:10px">
-  <label for="speed">播放速度</label><select id="speed"><option value="1500">慢速</option><option value="800" selected>正常</option><option value="300">快速</option><option value="100">極速</option></select>
-  <label for="visible">顯示根數</label><select id="visible"><option>30</option><option>50</option><option>80</option><option>120</option></select>
- </div>
 </section>
 <section class="panel" id="accountPanel">
  <div class="row" style="justify-content:space-between"><b>模擬帳戶／保證金</b><span class="tag">TMF · 10 元／點</span></div>
