@@ -117,6 +117,13 @@ test('portable backups include formal decision audit and lock metadata', () => {
   assert.match(html, /payload\.formalRunLock\.startDate===replayStartDate/);
 });
 
+test('portable backup export includes all replay sessions for the active dataset', () => {
+  assert.match(html, /function validateReplayBackupEnvelope\(s\)/);
+  assert.match(html, /if\(!item\|\|typeof item\.key!=="string"\|\|!item\.key\.startsWith\(prefix\)\)continue/);
+  assert.match(html, /!validateReplayBackupEnvelope\(item\.snapshot\)/);
+  assert.match(html, /payload\.datasetId!==replayDatasetId/);
+});
+
 test('portable backup import preserves an existing valid snapshot instead of overwriting it', () => {
   assert.match(html, /const existingRaw=localStorage\.getItem\(key\)/);
   assert.match(html, /existing\.checksum===snapshot\.checksum/);
