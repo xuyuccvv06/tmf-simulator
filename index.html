@@ -343,7 +343,7 @@ function updateTradeUI(){
  $('recordExitTime').textContent=lastTrade?lastTrade.exitTime.replace('T',' '):'—';
  $('recordExitPrice').textContent=lastTrade?lastTrade.exit.toLocaleString('en-US'):'—';
  $('recordPoints').textContent=lastTrade?`${lastTrade.points>=0?'+':''}${lastTrade.points.toFixed(1)} 點（${lastTrade.side}）`:'尚無已完成交易';
- $('recordPoints').style.color=lastTrade?(lastTrade.points>0?'#20c887':lastTrade.points<0?'#f06468':'#edf4fa'):'#edf4fa';
+ $('recordPoints').style.color=lastTrade?(lastTrade.points>0?'#f06468':lastTrade.points<0?'#20c887':'#edf4fa'):'#edf4fa';
  $('recordExitReason').textContent=lastTrade?lastTrade.exitReason:'—';
  renderAccount();
 }
