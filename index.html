@@ -618,6 +618,8 @@ loadDate=function(date){
  }
  replayStateReady=true;
 };
+const originalStopForState=stop;
+stop=function(){originalStopForState();saveReplayState(false);};
 const originalStepForState=step;
 step=function(){
  const nextBar=bars[revealed],nextDate=nextBar?.d||null;
