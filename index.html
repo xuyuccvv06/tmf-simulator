@@ -75,7 +75,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
  <div class="trade-record"><div><label for="depositAmount">追加資金（新臺幣）</label><input id="depositAmount" type="number" min="1" step="1" inputmode="numeric" placeholder="輸入入金金額"></div><div style="display:flex;align-items:end"><button id="depositButton" class="primary">確認入金</button></div></div>
  <div class="trade-record"><div><label for="initialMarginInput">每口原始保證金（元）</label><input id="initialMarginInput" type="number" min="1" step="1" inputmode="numeric"></div><div><label for="maintenanceMarginInput">每口維持保證金（元）</label><input id="maintenanceMarginInput" type="number" min="1" step="1" inputmode="numeric"></div><div class="full"><button id="saveMarginSettings">儲存保證金參數</button></div></div>
  <div class="note" id="accountLedger" style="margin-top:9px">資金異動紀錄載入中…</div>
- <p class="note">初始資金 NT$50,000。入金與已實現損益會累計至帳戶餘額，切換回放日期不會重置帳戶。保證金預設採期交所目前可查公告值；歷史日期對應的保證金表尚待串接。此階段損益尚未扣手續費、期交稅及滑價，後續成本模組完成前請勿視為淨損益。</p>
+ <p class="note">初始資金 NT$50,000。入金與已實現損益會累計至帳戶餘額，切換回放日期不會重置帳戶。保證金參數須依期交所公告資料手動設定；尚未設定時不啟動追繳／強平。歷史日期對應的保證金表尚待串接。此階段損益尚未扣手續費、期交稅及滑價，後續成本模組完成前請勿視為淨損益。</p>
 </section>
 <section class="panel">
  <b>模擬交易（市價單）</b>
@@ -141,7 +141,7 @@ let position=null, pendingOrder=null, realizedPoints=0, lastTrade=null;
 const ACCOUNT_KEY="tmf.sim.account.v1";
 function loadAccount(){
  try{const x=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||"null");if(x&&x.version===1&&Number.isFinite(x.balance)&&Array.isArray(x.ledger))return x;}catch(e){}
- const initial={version:1,balance:50000,initial_margin_per_contract:31800,maintenance_margin_per_contract:24400,ledger:[{type:"initial_capital",amount:50000,recorded_at:new Date().toISOString(),note:"模擬帳戶初始資金"}]};
+ const initial={version:1,balance:50000,initial_margin_per_contract:0,maintenance_margin_per_contract:0,ledger:[{type:"initial_capital",amount:50000,recorded_at:new Date().toISOString(),note:"模擬帳戶初始資金"}]};
  localStorage.setItem(ACCOUNT_KEY,JSON.stringify(initial));return initial;
 }
 let account=loadAccount(),marginLiquidationPending=false;
@@ -152,7 +152,7 @@ function accountMetrics(){const qty=position?1:0,u=accountUnrealized(),equity=ac
 function renderAccount(){
  const m=accountMetrics();$("accountBalance").textContent=money(account.balance);$("accountUnrealized").textContent=(m.u>0?"+":"")+money(m.u);$("accountEquity").textContent=money(m.equity);$("accountInitialUsed").textContent=money(m.initialUsed);$("accountMaintenance").textContent=money(m.maintenance);$("accountAvailable").textContent=money(m.available);
  $("accountUnrealized").style.color=m.u>0?"#f06468":m.u<0?"#20c887":"#edf4fa";
- let status="無持倉";if(position){if(marginLiquidationPending)status="保證金不足：已排定下一根 K 線開盤強制平倉";else if(m.equity<m.maintenance)status="低於維持保證金：即將強制平倉";else if(m.equity<m.initialUsed)status="低於原始保證金：保證金追繳警示";else status="保證金正常";}
+ let status="無持倉";if(!account.initial_margin_per_contract||!account.maintenance_margin_per_contract)status="尚未設定保證金參數；不進行追繳／強平判定";else if(position){if(marginLiquidationPending)status="保證金不足：已排定下一根 K 線開盤強制平倉";else if(m.equity<m.maintenance)status="低於維持保證金：即將強制平倉";else if(m.equity<m.initialUsed)status="低於原始保證金：保證金追繳警示";else status="保證金正常";}
  $("marginStatus").textContent="保證金狀態："+status+"｜每口原始 "+money(account.initial_margin_per_contract)+"／維持 "+money(account.maintenance_margin_per_contract);
  if(document.activeElement!==$("initialMarginInput"))$("initialMarginInput").value=account.initial_margin_per_contract;if(document.activeElement!==$("maintenanceMarginInput"))$("maintenanceMarginInput").value=account.maintenance_margin_per_contract;
  const rows=account.ledger.slice(-5).reverse();$("accountLedger").innerHTML="<b>最近資金異動</b><br>"+(rows.length?rows.map(x=>{const label=x.type==="deposit"?"入金":x.type==="realized_pnl"?"交易結算":"初始資金";return label+"｜"+new Date(x.recorded_at).toLocaleString("zh-TW")+"｜"+(x.amount>=0?"+":"")+money(x.amount);}).join("<br>"):"尚無資金異動");
@@ -160,7 +160,7 @@ function renderAccount(){
 function addAccountLedger(type,amount,note){account.ledger.push({type,amount,recorded_at:new Date().toISOString(),note:note||""});saveAccount();}
 function depositFunds(){const raw=$("depositAmount").value.trim(),amount=Number(raw);if(!raw||!Number.isSafeInteger(amount)||amount<=0){$("marginStatus").textContent="入金失敗：請輸入大於 0 的整數金額。";return;}account.balance+=amount;addAccountLedger("deposit",amount,"使用者手動追加資金");$("depositAmount").value="";renderAccount();$("marginStatus").textContent="入金成功："+money(amount)+"；已計入帳戶餘額。";}
 function saveMarginSettings(){const initial=Number($("initialMarginInput").value),maintenance=Number($("maintenanceMarginInput").value);if(!Number.isSafeInteger(initial)||!Number.isSafeInteger(maintenance)||initial<=0||maintenance<=0||initial<maintenance){$("marginStatus").textContent="保證金參數無效：原始保證金與維持保證金須為正整數，且原始不得低於維持。";return;}account.initial_margin_per_contract=initial;account.maintenance_margin_per_contract=maintenance;saveAccount();renderAccount();$("marginStatus").textContent="保證金參數已保存。";}
-function checkMargin(){if(!position||marginLiquidationPending)return;const m=accountMetrics();if(m.equity<m.maintenance){marginLiquidationPending=true;$("orderStatus").textContent="帳戶權益低於維持保證金，已排定下一根 K 線開盤強制平倉。";renderAccount();}}
+function checkMargin(){if(!position||marginLiquidationPending||!account.maintenance_margin_per_contract)return;const m=accountMetrics();if(m.equity<m.maintenance){marginLiquidationPending=true;$("orderStatus").textContent="帳戶權益低於維持保證金，已排定下一根 K 線開盤強制平倉。";renderAccount();}}
 
 const $=id=>document.getElementById(id);
 function setStatus(s){$('status').textContent=s}
@@ -280,7 +280,7 @@ function placeMarketOrder(type){
  if(revealed>=bars.length){$('orderStatus').textContent='本局已結束，無法送單。';return}
  if(type==='close'&&!position){return}
  if((type==='buy'||type==='sell')&&position){$('orderStatus').textContent='目前已有持倉，請先平倉後再進場。';return}
- if((type==='buy'||type==='sell')&&account.balance<account.initial_margin_per_contract){$('orderStatus').textContent='帳戶餘額不足原始保證金，無法建立新倉。';return}
+ if((type==='buy'||type==='sell')&&account.initial_margin_per_contract>0&&account.balance<account.initial_margin_per_contract){$('orderStatus').textContent='帳戶餘額不足原始保證金，無法建立新倉。';return}
  try{
   const stopDistance=(type==='buy'||type==='sell')?readDistance('stopLossPoints'):null;
   const targetDistance=(type==='buy'||type==='sell')?readDistance('takeProfitPoints'):null;
