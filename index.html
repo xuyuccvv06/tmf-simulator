@@ -24,7 +24,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
 </style>
 </head>
 <body>
-<header><h1>TMF 盤感訓練器 <span class="tag">V2.0 市價單測試</span></h1><div class="sub">5 分鐘 K 線・逐根盲測・真實歷史資料</div><nav style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><a href="./index.html" style="color:#edf4fa;text-decoration:none;background:#1b2a39;border:1px solid #35485b;border-radius:9px;padding:8px 12px">盤感回放</a><a href="./trade_journal.html" style="color:#edf4fa;text-decoration:none;background:#176b50;border:1px solid #218c69;border-radius:9px;padding:8px 12px">交易行為紀錄</a></nav></header>
+<header><h1>TMF 盤感訓練器 <span class="tag">V2.0 市價單測試</span></h1><div class="sub">5 分鐘 K 線・逐根盲測・真實歷史資料</div><nav style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><a id="replayNav" href="./index.html" style="color:#edf4fa;text-decoration:none;background:#1b2a39;border:1px solid #35485b;border-radius:9px;padding:8px 12px">盤感回放</a><a id="journalNav" href="./trade_journal.html" style="color:#edf4fa;text-decoration:none;background:#176b50;border:1px solid #218c69;border-radius:9px;padding:8px 12px">交易行為紀錄</a><label style="display:flex;align-items:center;gap:6px;color:#9fb0c0">模式<select id="modeSelector" style="width:auto;padding:7px 9px"><option value="practice">練習模式</option><option value="formal">正式盤感測試</option></select></label></nav></header>
 <main>
 <section class="panel">
  <div class="row" style="justify-content:space-between"><b>行情狀態</b><span id="status">資料載入中…</span></div>
@@ -138,11 +138,20 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
 <script>
 let all=[], dates=[], bars=[], revealed=0, timer=null, viewStart=0, selectedIndex=0, replayStartDate=null, replayStartMode='night';
 let position=null, pendingOrder=null, realizedPoints=0, lastTrade=null;
-const ACCOUNT_KEY="tmf.sim.account.v1";
+const MODE_PARAM=new URLSearchParams(location.search).get("mode"),SIM_MODE=MODE_PARAM==="formal"?"formal":"practice";
+const MODE_LABEL=SIM_MODE==="formal"?"正式盤感測試":"練習模式";
+const ACCOUNT_KEY="tmf.sim.account."+SIM_MODE+".v1",LEGACY_ACCOUNT_KEY="tmf.sim.account.v1";
+function freshAccount(){return {version:1,balance:50000,initial_margin_per_contract:0,maintenance_margin_per_contract:0,ledger:[{type:"initial_capital",amount:50000,recorded_at:new Date().toISOString(),note:MODE_LABEL+"初始資金"}]};}
 function loadAccount(){
- try{const x=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||"null");if(x&&x.version===1&&Number.isFinite(x.balance)&&Array.isArray(x.ledger))return x;}catch(e){}
- const initial={version:1,balance:50000,initial_margin_per_contract:0,maintenance_margin_per_contract:0,ledger:[{type:"initial_capital",amount:50000,recorded_at:new Date().toISOString(),note:"模擬帳戶初始資金"}]};
- localStorage.setItem(ACCOUNT_KEY,JSON.stringify(initial));return initial;
+ try{
+  const current=JSON.parse(localStorage.getItem(ACCOUNT_KEY)||"null");
+  if(current&&current.version===1&&Number.isFinite(current.balance)&&Array.isArray(current.ledger))return current;
+  if(SIM_MODE==="practice"){
+   const legacy=JSON.parse(localStorage.getItem(LEGACY_ACCOUNT_KEY)||"null");
+   if(legacy&&legacy.version===1&&Number.isFinite(legacy.balance)&&Array.isArray(legacy.ledger)){localStorage.setItem(ACCOUNT_KEY,JSON.stringify(legacy));return legacy;}
+  }
+ }catch(e){}
+ const initial=freshAccount();localStorage.setItem(ACCOUNT_KEY,JSON.stringify(initial));return initial;
 }
 let account=loadAccount(),marginLiquidationPending=false;
 const money=n=>"NT$"+Math.round(n).toLocaleString("zh-TW");
@@ -211,7 +220,10 @@ function readDistance(id){
  return value;
 }
 function saveSimulationTrade(closed,fill,time,reason,pts){
- const key="tmf.behaviourJournal.v1",saved=JSON.parse(localStorage.getItem(key)||'{"version":1,"events":[]}');
+ const key="tmf.behaviourJournal."+SIM_MODE+".v1",legacyKey="tmf.behaviourJournal.v1";
+  let saved=JSON.parse(localStorage.getItem(key)||"null");
+  if(!saved&&SIM_MODE==="practice"){saved=JSON.parse(localStorage.getItem(legacyKey)||'{"version":1,"events":[]}');localStorage.setItem(key,JSON.stringify(saved));}
+  if(!saved)saved={version:1,events:[]};
  if(!saved||saved.version!==1||!Array.isArray(saved.events))throw new Error("交易行為紀錄格式無法辨識，為避免覆蓋舊資料已停止保存");
  const entryIndex=bars.findIndex(b=>b.t===closed.entryTime),exitIndex=bars.findIndex(b=>b.t===time);
  if(entryIndex<0||exitIndex<0)throw new Error("找不到交易對應的歷史 K 線");
@@ -348,6 +360,10 @@ $('buy').onclick=()=>placeMarketOrder('buy');$('sell').onclick=()=>placeMarketOr
 $('step').onclick=step;$('play').onclick=play;$('applyStop').onclick=applyManagedStop;$('applyTarget').onclick=applyManagedTarget;$('reset').onclick=()=>loadDate($('session').value);$('speed').onchange=()=>{if(timer){stop();play()}};$('visible').onchange=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);if(selectedIndex<viewStart)selectedIndex=viewStart;render()};$('latest').onclick=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);render()};$('session').onchange=()=>loadDate($('session').value);$('replayMode').onchange=()=>loadDate($('session').value);$('newSession').onclick=()=>{const d=dates[Math.floor(Math.random()*dates.length)];$('session').value=d;loadDate(d)};
 async function init(){try{setStatus('正在載入 CSV…');const res=await fetch('./TMFR1_5min_2024-2025.csv');if(!res.ok)throw new Error(`CSV 載入失敗：HTTP ${res.status}`);const rawCsv=await res.text();all=parseCSV(rawCsv);if(!all.length)throw new Error('CSV 沒有可用行情');all.sort((a,b)=>a.t.localeCompare(b.t));let backupSync='';try{const saved=await saveReplayDatasetToJournalDB(rawCsv,all);backupSync=`・完整行情已同步備份（${saved.rowCount.toLocaleString()} 根）`;}catch(syncError){backupSync='・行情備份同步失敗：'+syncError.message;}dates=[...new Set(all.filter(x=>x.t.slice(11,16)>='08:45'&&x.t.slice(11,16)<='13:45').map(x=>x.t.slice(0,10)))].sort();dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;$('session').appendChild(o)});$('session').value=dates[0];loadDate(dates[0]);setStatus(`資料載入完成・${all.length.toLocaleString()} 根${backupSync}`)}catch(e){setStatus('載入失敗');const msg=document.createElement('p');msg.className='note';msg.style.color='#f06468';msg.textContent=e.message+'。請確認 CSV 與 HTML 位於同一個 GitHub Repository 根目錄，並透過 GitHub Pages 網址開啟。';document.querySelector('main').prepend(msg)}}
 $("depositButton").onclick=depositFunds;$("saveMarginSettings").onclick=saveMarginSettings;
+$("modeSelector").value=SIM_MODE;
+$("modeSelector").onchange=()=>{if(position||pendingOrder){alert("請先平倉並取消待成交委託，再切換模式，避免持倉狀態遺失。");$("modeSelector").value=SIM_MODE;return;}location.href="./index.html?mode="+$("modeSelector").value;};
+$("replayNav").href="./index.html?mode="+SIM_MODE;$("journalNav").href="./trade_journal.html?mode="+SIM_MODE;
+document.querySelector("header h1").insertAdjacentHTML("beforeend",' <span class="tag">'+MODE_LABEL+'</span>');
 init();
 </script>
 </body></html>
