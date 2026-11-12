@@ -33,9 +33,11 @@ def simulate(
 ) -> list[Trade]:
     """Simulate each order independently, entering at the next bar's open.
 
-    Slippage is charged adversely on both entry and exit. Round-trip fees/tax
-    are deducted once from gross points. Orders without a following bar, or
-    whose timestamp is absent from the bar series, are skipped.
+    Market-style entry, stop and end-of-data exits incur adverse slippage.
+    Take-profit limit fills do not. Dynamic slippage uses only completed bars
+    before the fill bar. Round-trip fees/tax are deducted once from gross points.
+    Orders without a following bar, or whose timestamp is absent from the bar
+    series, are skipped.
     """
     errors = validate_bars(bars)
     if errors:
