@@ -888,8 +888,8 @@ $("replayBackupFile").onchange=async()=>{
   if(!added.length&&!decisionLogImported)throw new Error("檔案內沒有可通過完整性驗證且可匯入的備份或決策紀錄。");
   const merged=[...added,...index].filter((x,i,a)=>a.findIndex(y=>y.key===x.key&&y.savedAt===x.savedAt)===i).slice(0,60);
   localStorage.setItem(REPLAY_BACKUP_INDEX,JSON.stringify(merged));
-  if(payload.formalRunLock&&SIM_MODE==="formal"&&!formalRunLock&&payload.formalRunLock.datasetId===replayDatasetId){
-   formalRunLock=payload.formalRunLock;localStorage.setItem(formalLockStorageKey(),JSON.stringify(formalRunLock));applyFormalLockUI();
+  if(payload.formalRunLock&&SIM_MODE==="formal"&&!formalRunLock&&payload.formalRunLock.datasetId===replayDatasetId&&payload.formalRunLock.startDate===replayStartDate&&payload.formalRunLock.replayMode===replayStartMode){
+   formalRunLock=payload.formalRunLock;account.costs={...formalRunLock.costs};saveAccount();localStorage.setItem(formalLockStorageKey(),JSON.stringify(formalRunLock));applyFormalLockUI();
   }
   $("replaySaveStatus").textContent="已匯入 "+added.length+" 個有效備份版本"+(decisionLogImported?"及正式決策紀錄":"")+"；既有有效資料未覆蓋。";
  }catch(err){$("replaySaveStatus").textContent="匯入失敗，原有備份未覆蓋："+err.message;}
