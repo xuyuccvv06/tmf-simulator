@@ -371,7 +371,7 @@ function sealFormalDecisionLog(){
 function formalLockStorageKey(){return "tmf.formal.lock.v1."+replayDatasetId;}
 function applyFormalLockUI(){
  const locked=SIM_MODE==="formal"&&!!formalRunLock;
- for(const id of ["commissionPerSide","baseSlippage","rangeSlippage","lowVolumePenalty","dynamicSlippage","saveCostSettings","initialMarginInput","maintenanceMarginInput","saveMarginSettings","marginHistoryDate","lookupHistoricalMargin","applyHistoricalMargin"])
+ for(const id of ["datasetSelector","datasetUploadFile","importReplayDataset","commissionPerSide","baseSlippage","rangeSlippage","lowVolumePenalty","dynamicSlippage","saveCostSettings","initialMarginInput","maintenanceMarginInput","saveMarginSettings","marginHistoryDate","lookupHistoricalMargin","applyHistoricalMargin"])
   if($(id))$(id).disabled=locked;
  if($("formalLockButton"))$("formalLockButton").style.display=SIM_MODE==="formal"&&!locked?"block":"none";
  if($("formalLockStatus"))$("formalLockStatus").textContent=locked?
