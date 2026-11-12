@@ -627,7 +627,6 @@ loadDate=function(date){
  if(replayStartDate!==date||replayStartMode!==requestedMode)return;
  marginCall=null;
  const restored=restoreReplayState(date,requestedMode);
- applyHistoricalMarginForReplayDate(date);
  if(!restored){
   try{
    const saved=JSON.parse(localStorage.getItem(datasetAccountKey(date,requestedMode))||"null");
@@ -636,9 +635,11 @@ loadDate=function(date){
   saveAccount();
   replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
   render();updateTradeUI();
-  saveReplayState(false);
  }
+ applyHistoricalMarginForReplayDate(date);
+ renderMarginCall();
  replayStateReady=true;
+ saveReplayState(false);
 };
 function renderMarginCall(){
  const el=$("marginCallStatus");if(!el)return;
