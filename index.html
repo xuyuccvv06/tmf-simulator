@@ -684,9 +684,11 @@ $("restoreReplayBackup").onclick=()=>{
 $("exportReplayBackups").onclick=()=>{
  const prefix=REPLAY_STATE_PREFIX+replayDatasetId+".";
  const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]");
- const backups=index.filter(x=>x.key.startsWith(prefix)&&x.session===replayStartDate&&x.replayMode===replayStartMode)
-  .map(x=>({key:x.key,meta:x,snapshot:JSON.parse(localStorage.getItem(x.key)||"null")}))
-  .filter(x=>validateReplayState(x.snapshot));
+ const backups=[];
+ for(const item of index){
+  if(!item||typeof item.key!=="string"||!item.key.startsWith(prefix)||item.session!==replayStartDate||item.replayMode!==replayStartMode)continue;
+  try{const snapshot=JSON.parse(localStorage.getItem(item.key)||"null");if(validateReplayState(snapshot))backups.push({key:item.key,meta:item,snapshot});}catch{}
+ }
  if(!backups.length){alert("目前場次沒有有效備份可匯出。");return;}
  const payload={schema:1,mode:SIM_MODE,datasetId:replayDatasetId,session:replayStartDate,replayMode:replayStartMode,exportedAt:new Date().toISOString(),backups};
  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
