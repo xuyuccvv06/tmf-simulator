@@ -42,6 +42,13 @@ test('unrealized P&L estimates include closing slippage, both-side commission an
   assert.match(body, /tax=\(position\.entry\+mark\)\*10\*0\.00002/);
 });
 
+test('browser dynamic slippage uses only completed bars before the fill bar', () => {
+  const body = functionBody('estimatedSlippage');
+  assert.match(body, /priorBars=bars\.slice/);
+  assert.match(body, /previousRange/);
+  assert.doesNotMatch(body, /bar\.(h|l|v)/);
+});
+
 test('cost setting rendering does not overwrite a field while the user is editing it', () => {
   const body = functionBody('renderCostSettings');
   assert.match(body, /document\.activeElement!==el/);
