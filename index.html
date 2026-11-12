@@ -278,7 +278,7 @@ function finishPosition(fill,time,reason){
  lastTrade={side:closed.side,entryTime:closed.entryTime,entry:closed.entry,exitTime:time,exit:actualFill,points:netPoints,grossPoints:pts,commission:commission,tax:tax,exitReason:reason};
  try{saveSimulationTrade(closed,actualFill,time,reason,netPoints);}
  catch(err){$('orderStatus').textContent+='｜交易歷史保存失敗：'+err.message;}
- $('orderStatus').textContent=`${closed.side}單已出場（${reason}）｜進場 ${closed.entryTime} @ ${closed.entry.toLocaleString('en-US')}｜出場 ${time} @ ${fill.toLocaleString('en-US')}｜損益 ${pts>=0?'+':''}${pts.toFixed(1)} 點`;
+ $('orderStatus').textContent=`${closed.side}單已出場（${reason}）｜進場 ${closed.entryTime} @ ${closed.entry.toLocaleString('en-US')}｜出場 ${time} @ ${actualFill.toLocaleString('en-US')}｜淨損益 ${netPoints>=0?'+':''}${netPoints.toFixed(1)} 點`;
  position=null;
 }
 function evaluateStops(bar){
@@ -312,13 +312,13 @@ function executePending(bar){
  if(order.type==='buy'||order.type==='sell'){
   const side=order.type==='buy'?'多':'空';
   const actualEntry=adverseFill(fill,side,bar);position={side,entry:actualEntry,entryTime:bar.t,
-   stopLoss:order.stopDistance===null?null:fill+(side==='多'?-order.stopDistance:order.stopDistance),
-   takeProfit:order.targetDistance===null?null:fill+(side==='多'?order.targetDistance:-order.targetDistance),stopHistory:[],targetHistory:[]};
+   stopLoss:order.stopDistance===null?null:actualEntry+(side==='多'?-order.stopDistance:order.stopDistance),
+   takeProfit:order.targetDistance===null?null:actualEntry+(side==='多'?order.targetDistance:-order.targetDistance),stopHistory:[],targetHistory:[]};
   if(position.stopLoss!==null)position.stopHistory.push({kind:'stop',old_price:null,new_price:position.stopLoss,market_timestamp:bar.t,recorded_at:new Date().toISOString(),status:'accepted',reason:'開倉委託初始停損'});
   if(position.takeProfit!==null)position.targetHistory.push({kind:'target',old_price:null,new_price:position.takeProfit,market_timestamp:bar.t,recorded_at:new Date().toISOString(),status:'accepted',reason:'開倉委託初始停利'});
   const risk=position.stopLoss===null?'未設定停損':'停損 '+position.stopLoss.toLocaleString('en-US');
   const reward=position.takeProfit===null?'未設定停利':'停利 '+position.takeProfit.toLocaleString('en-US');
-  $('orderStatus').textContent=`${side}單已成交：${fill.toLocaleString('en-US')} 點（${bar.t}）｜${risk}｜${reward}`;
+  $('orderStatus').textContent=`${side}單已成交：${actualEntry.toLocaleString('en-US')} 點（${bar.t}）｜${risk}｜${reward}`;
  }else if(order.type==='close'&&position){
   finishPosition(fill,bar.t,'手動平倉');
  }
