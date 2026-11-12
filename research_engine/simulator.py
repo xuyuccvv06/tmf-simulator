@@ -2,8 +2,9 @@
 
 This is an independent-trade research primitive, not a portfolio or exchange
 matching engine. If stop and target are both touched in one OHLC bar, stop wins.
-Stop gaps fill at the bar open (then adverse exit slippage); target fills at its
-limit price (then configured adverse exit slippage).
+Stop gaps fill at the worse of the stop and bar open, then incur adverse
+market slippage. Take-profit targets are limit fills and do not incur adverse
+market slippage; favorable gaps may fill at the better opening price.
 """
 from math import isfinite
 
@@ -90,14 +91,16 @@ def simulate(
                 target_touched = bar.high >= target if direction == 1 else bar.low <= target
                 if target_touched:
                     exit_i = j
-                    exit_price = target
+                    # Favorable gap-through a limit target receives price improvement.
+                    exit_price = max(bar.open, target) if direction == 1 else min(bar.open, target)
                     reason = "target"
                     break
 
-        # Exit slippage is always adverse to the position.
-        exit_slippage = (dynamic_slippage_points(bars, exit_i, dynamic_slippage_config)
-                         if dynamic_slippage_config is not None else slippage_points)
-        exit_price -= direction * exit_slippage
+        # A take-profit is a limit fill: do not apply adverse market slippage.
+        if reason != "target":
+            exit_slippage = (dynamic_slippage_points(bars, exit_i, dynamic_slippage_config)
+                             if dynamic_slippage_config is not None else slippage_points)
+            exit_price -= direction * exit_slippage
         gross = (exit_price - entry) * direction
         if tmf_cost_config is not None:
             cost = calculate_round_trip_cost_twd(entry, exit_price, tmf_cost_config)["total_points"]
