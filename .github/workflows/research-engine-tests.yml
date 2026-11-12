@@ -34,6 +34,9 @@ jobs:
           for script in /tmp/index*.js /tmp/trade_journal*.js; do
             [ -f "$script" ] && node --check "$script"
           done
+      - name: Test browser simulator cost and margin contracts
+        run: node --test tests/tmf_cost_margin_contract.test.cjs
+
       - name: Test trade journal statistics and audit behavior
         run: node --test tests/trade_journal_stats.test.cjs
       - name: Test practice and formal mode isolation
