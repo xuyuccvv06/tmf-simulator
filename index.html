@@ -567,10 +567,21 @@ function saveReplayState(manual=false){
   const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]");
   const entry={key,savedAt:snapshot.savedAt,bytes:raw.length,session:snapshot.session,replayMode:snapshot.replayMode};
   index.unshift(entry);
-  const unique=index.filter((x,i,a)=>a.findIndex(y=>y.key===x.key&&y.savedAt===x.savedAt)===i).slice(0,60);
-  // Remove only expired snapshots created under this feature's own namespace.
-  const retained=new Set(unique.map(x=>x.key));
-  for(const old of index)if(old&&typeof old.key==="string"&&old.key.startsWith(REPLAY_STATE_PREFIX+replayDatasetId+".")&&!retained.has(old.key))localStorage.removeItem(old.key);
+  const dedup=index.filter((x,i,a)=>a.findIndex(y=>y.key===x.key&&y.savedAt===x.savedAt)===i);
+  const prefix=REPLAY_STATE_PREFIX+replayDatasetId+".";
+  const scoped=dedup.filter(x=>x&&typeof x.key==="string"&&x.key.startsWith(prefix)).sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt));
+  const counts=new Map(),retainedCurrent=[];
+  for(const item of scoped){
+   const group=item.session+"|"+item.replayMode,limit=item.session===snapshot.session&&item.replayMode===snapshot.replayMode?3:2;
+   const count=counts.get(group)||0;
+   if(count<limit){retainedCurrent.push(item);counts.set(group,count+1);}
+  }
+  const retainedKeys=new Set(retainedCurrent.map(x=>x.key));
+  // Keep two valid recovery versions per replay session, three for the active session.
+  // Prune only expired snapshots created under this feature's own namespace.
+  for(const old of scoped)if(!retainedKeys.has(old.key))localStorage.removeItem(old.key);
+  const otherDatasets=dedup.filter(x=>!x||typeof x.key!=="string"||!x.key.startsWith(prefix));
+  const unique=[...retainedCurrent,...otherDatasets];
   localStorage.setItem(REPLAY_BACKUP_INDEX,JSON.stringify(unique));
   const status=$("replaySaveStatus");
   if(status)status.textContent=(manual?"已安全保存，可以離開":"自動保存完成")+"｜"+new Date(snapshot.savedAt).toLocaleString("zh-TW")+"｜資料完整性檢查通過";
