@@ -617,7 +617,7 @@ async function switchReplayDataset(datasetId){
   if(!nextDates.length)throw new Error("此資料集沒有可回放的日盤交易日。");
   replayStateReady=false;replayDatasetId=datasetId;all=loaded.bars;dates=nextDates;account=freshAccount();
   position=null;pendingOrder=null;marginCall=null;marginLiquidationPending=false;
-  replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+  replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[]};
   populateReplaySessions();
   localStorage.setItem(selectedDatasetStorageKey(),datasetId);
   loadFormalLockForDataset();
@@ -741,7 +741,7 @@ document.querySelector("header h1").insertAdjacentHTML("beforeend",' <span class
 const REPLAY_STATE_PREFIX="tmf.replay.state."+SIM_MODE+".v1.";
 const REPLAY_BACKUP_INDEX="tmf.replay.backups."+SIM_MODE+".v1";
 document.getElementById("formalPerformancePanel").style.display=SIM_MODE==="formal"?"block":"none";
-let replayDatasetId="unverified", replayStateReady=false, marginCall=null, formalRunLock=null, replayRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+let replayDatasetId="unverified", replayStateReady=false, marginCall=null, formalRunLock=null, replayRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[]};
 function replayStateKey(date,mode,stamp){return REPLAY_STATE_PREFIX+replayDatasetId+"."+date+"."+mode+"."+(stamp||new Date().toISOString().replace(/[:.]/g,"-"));}
 function replayChecksum(value){
  const copy={...value};delete copy.checksum;
@@ -932,7 +932,7 @@ step=function(){
  if(current)evaluateMarginCall(current);
  if(current&&replayRisk.tradingDate===current.d){
   const equity=accountMetrics().equity;
-  replayRisk.dayNet=equity-replayRisk.dayStartEquity;
+  replayRisk.dayNet=equity-replayRisk.dayStartEquity-(replayRisk.dayDeposits||0);
   replayRisk.dayPeakNet=Math.max(replayRisk.dayPeakNet||0,replayRisk.dayNet);
   replayRisk.profitGiveback=Math.max(0,replayRisk.dayPeakNet-replayRisk.dayNet);
   replayRisk.maxProfitGiveback=Math.max(replayRisk.maxProfitGiveback||0,replayRisk.profitGiveback);
@@ -970,7 +970,11 @@ finishPosition=function(...args){
  renderFormalPerformance();saveReplayState(false);
 };
 const originalDepositForState=depositFunds;
-depositFunds=function(){originalDepositForState();if(position)checkMargin();renderMarginCall();renderFormalPerformance();saveReplayState(false);};
+depositFunds=function(){
+ const before=account.balance;originalDepositForState();const deposited=account.balance-before;
+ if(replayRisk.tradingDate&&deposited>0)replayRisk.dayDeposits=(replayRisk.dayDeposits||0)+deposited;
+ if(position)checkMargin();renderMarginCall();renderFormalPerformance();saveReplayState(false);
+};
 const originalApplyStopForState=applyManagedStop;
 applyManagedStop=function(){originalApplyStopForState();saveReplayState(false);};
 const originalApplyTargetForState=applyManagedTarget;
