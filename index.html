@@ -843,7 +843,8 @@ $("exportReplayBackups").onclick=()=>{
   try{const snapshot=JSON.parse(localStorage.getItem(item.key)||"null");if(validateReplayState(snapshot))backups.push({key:item.key,meta:item,snapshot});}catch{}
  }
  if(!backups.length){alert("目前場次沒有有效備份可匯出。");return;}
- const payload={schema:1,mode:SIM_MODE,datasetId:replayDatasetId,session:replayStartDate,replayMode:replayStartMode,exportedAt:new Date().toISOString(),backups};
+ let formalDecisionLog=null;try{formalDecisionLog=JSON.parse(localStorage.getItem(formalDecisionKey())||"null");}catch{}
+ const payload={schema:1,mode:SIM_MODE,datasetId:replayDatasetId,session:replayStartDate,replayMode:replayStartMode,exportedAt:new Date().toISOString(),backups,formalDecisionLog,formalRunLock};
  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
  const url=URL.createObjectURL(blob),a=document.createElement("a");
  a.href=url;a.download="tmf-replay-backup-"+replayDatasetId+"-"+replayStartDate+".json";
@@ -875,10 +876,22 @@ $("replayBackupFile").onchange=async()=>{
    localStorage.setItem(key,serialized);
    added.push({key,savedAt:snapshot.savedAt,bytes:serialized.length,session:snapshot.session,replayMode:snapshot.replayMode});
   }
-  if(!added.length)throw new Error("檔案內沒有可通過完整性驗證的備份版本。");
+  let decisionLogImported=false;
+  if(payload.formalDecisionLog&&SIM_MODE==="formal"){
+   const incoming=payload.formalDecisionLog;
+   if(incoming.schema===1&&incoming.datasetId===replayDatasetId&&Array.isArray(incoming.events)&&incoming.checksum===formalDecisionChecksum(incoming.events)){
+    const existingRaw=localStorage.getItem(formalDecisionKey());
+    if(!existingRaw){localStorage.setItem(formalDecisionKey(),JSON.stringify(incoming));decisionLogImported=true;}
+    else{try{const existing=JSON.parse(existingRaw);if(existing.checksum===incoming.checksum)decisionLogImported=true;}catch{}}
+   }
+  }
+  if(!added.length&&!decisionLogImported)throw new Error("檔案內沒有可通過完整性驗證且可匯入的備份或決策紀錄。");
   const merged=[...added,...index].filter((x,i,a)=>a.findIndex(y=>y.key===x.key&&y.savedAt===x.savedAt)===i).slice(0,60);
   localStorage.setItem(REPLAY_BACKUP_INDEX,JSON.stringify(merged));
-  $("replaySaveStatus").textContent="已匯入 "+added.length+" 個有效備份版本；原有交易紀錄未變更。";
+  if(payload.formalRunLock&&SIM_MODE==="formal"&&!formalRunLock&&payload.formalRunLock.datasetId===replayDatasetId){
+   formalRunLock=payload.formalRunLock;localStorage.setItem(formalLockStorageKey(),JSON.stringify(formalRunLock));applyFormalLockUI();
+  }
+  $("replaySaveStatus").textContent="已匯入 "+added.length+" 個有效備份版本"+(decisionLogImported?"及正式決策紀錄":"")+"；既有有效資料未覆蓋。";
  }catch(err){$("replaySaveStatus").textContent="匯入失敗，原有備份未覆蓋："+err.message;}
  finally{$("replayBackupFile").value="";}
 };
