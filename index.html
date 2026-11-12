@@ -572,7 +572,7 @@ function restoreReplayState(date,mode){
   position=s.position;pendingOrder=s.pendingOrder;realizedPoints=s.realizedPoints;
   lastTrade=s.lastTrade;account=s.account;marginLiquidationPending=false;marginCall=s.marginCall||null;
   replayRisk=s.replayRisk||replayRisk;
-  saveAccount();render();updateTradeUI();
+  saveAccount();render();updateTradeUI();renderMarginCall();
   $("replaySaveStatus").textContent="已恢復備份｜"+new Date(s.savedAt).toLocaleString("zh-TW")+"｜完整性檢查通過";
   return true;
  }catch(err){
@@ -605,6 +605,7 @@ loadDate=function(date){
  originalLoadDateForState(date);
  // loadDate may be cancelled by its existing confirmation dialog.
  if(replayStartDate!==date||replayStartMode!==requestedMode)return;
+ marginCall=null;
  const restored=restoreReplayState(date,requestedMode);
  if(!restored){
   try{
