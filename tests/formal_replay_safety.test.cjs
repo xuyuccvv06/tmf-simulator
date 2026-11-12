@@ -6,7 +6,7 @@ const path = require('node:path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
 test('replay snapshots are mode- and dataset-scoped and validate before restore', () => {
-  assert.match(html, /REPLAY_STATE_PREFIX="tmf\.replay\.state\.\+SIM_MODE/);
+  assert.match(html, /REPLAY_STATE_PREFIX="tmf\.replay\.state\."\+SIM_MODE/);
   assert.match(html, /function replayStateKey\(date,mode\)/);
   assert.match(html, /function validateReplayState\(s\)/);
   assert.match(html, /function restoreReplayState\(date,mode\)/);
@@ -40,6 +40,6 @@ test('daily 4 percent loss and 12-loss streak block new entries and cancel entry
 
 test('existing account and behaviour journal keys are not deleted or cleared by replay backup code', () => {
   assert.doesNotMatch(html, /localStorage\.(removeItem|clear)\(/);
-  assert.match(html, /tmf\.behaviourJournal\.\+SIM_MODE/);
-  assert.match(html, /tmf\.sim\.account\.\+SIM_MODE/);
+  assert.match(html, /tmf\.behaviourJournal\."\+SIM_MODE/);
+  assert.match(html, /tmf\.sim\.account\."\+SIM_MODE/);
 });
