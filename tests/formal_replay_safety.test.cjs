@@ -17,7 +17,7 @@ test('replay snapshots are mode- and dataset-scoped and validate before restore'
 test('manual save, multiple backup index and page lifecycle pause are wired', () => {
   assert.match(html, /id="saveReplayNow"/);
   assert.match(html, /id="restoreReplayBackup"/);
-  assert.match(html, /REPLAY_BACKUP_INDEX/);
+  assert.match(html, /REPLAY_BACKUP_INDEX/);\n  assert.match(html, /slice\\(0,60\\)/);\n  assert.match(html, /old\\.key\\.startsWith\\(REPLAY_STATE_PREFIX/);
   assert.match(html, /已安全保存，可以離開/);
   assert.match(html, /document\.addEventListener\("visibilitychange"/);
   assert.match(html, /window\.addEventListener\("pagehide"/);
