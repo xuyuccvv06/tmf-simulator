@@ -772,10 +772,21 @@ $("replayBackupFile").onchange=async()=>{
   const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]"),added=[];
   for(const item of payload.backups){
    if(!item||!item.snapshot||!validateReplayState(item.snapshot)||item.snapshot.session!==replayStartDate||item.snapshot.replayMode!==replayStartMode)continue;
-   const key=item.snapshot.key;
+   let snapshot={...item.snapshot},key=snapshot.key;
    if(typeof key!=="string"||!key.startsWith(REPLAY_STATE_PREFIX+replayDatasetId+"."))continue;
-   localStorage.setItem(key,JSON.stringify(item.snapshot));
-   added.push({key,savedAt:item.snapshot.savedAt,bytes:JSON.stringify(item.snapshot).length,session:item.snapshot.session,replayMode:item.snapshot.replayMode});
+   const existingRaw=localStorage.getItem(key);
+   if(existingRaw){
+    try{
+     const existing=JSON.parse(existingRaw);
+     if(validateReplayState(existing)&&existing.checksum===snapshot.checksum)continue;
+    }catch{}
+    key=key+".import."+Date.now()+"."+added.length;
+    snapshot.key=key;snapshot.checksum=replayChecksum(snapshot);
+   }
+   if(!validateReplayState(snapshot))continue;
+   const serialized=JSON.stringify(snapshot);
+   localStorage.setItem(key,serialized);
+   added.push({key,savedAt:snapshot.savedAt,bytes:serialized.length,session:snapshot.session,replayMode:snapshot.replayMode});
   }
   if(!added.length)throw new Error("檔案內沒有可通過完整性驗證的備份版本。");
   const merged=[...added,...index].filter((x,i,a)=>a.findIndex(y=>y.key===x.key&&y.savedAt===x.savedAt)===i).slice(0,60);
