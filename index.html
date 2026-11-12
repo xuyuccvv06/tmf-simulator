@@ -526,7 +526,7 @@ async function init(){try{await loadHistoricalMarginData();setStatus('正在載�
 
 /* One-bar limit-entry orders: checked only against the next revealed bar, then expire. */
 function placeLimitEntry(side){
- if(SIM_MODE==="formal"&&!formalRunLock){$("orderStatus").textContent="請先鎖定正式測試設定，才可進行正式測試下單。";return;}
+ if(SIM_MODE==="formal"&&!formalRunLock){$("orderStatus").textContent="請先鎖定正式測試設定，才可進行正式測試下單。";return;}if(SIM_MODE==="formal"&&formalRunLock.completedAt){$("orderStatus").textContent="正式盲測已完成並封存，禁止新增交易。";return;}
  if(position||pendingOrder){$("orderStatus").textContent="目前已有持倉或待成交委託，請先處理後再送單。";return;}
  if(revealed>=bars.length){$("orderStatus").textContent="本局已結束，無法送單。";return;}
  if(replayRisk.blockedDate===(bars[revealed-1]?.d||replayStartDate)){ $("orderStatus").textContent="風控已封鎖今日新增進場。";return;}
@@ -536,6 +536,7 @@ function placeLimitEntry(side){
   const stopDistance=readDistance("stopLossPoints"),targetDistance=readDistance("takeProfitPoints");
   if(account.initial_margin_per_contract>0&&account.balance<account.initial_margin_per_contract){$("orderStatus").textContent="帳戶餘額不足原始保證金，無法建立新倉。";return;}
   pendingOrder={type:side==="多"?"limitBuy":"limitSell",limitPrice:price,stopDistance,targetDistance,submittedAt:bars[revealed-1]?.t||null,expiresAfterNextBar:true};
+  recordFormalDecision("entry_order_submitted",{direction:side,orderType:"limit",limitPrice:price,decisionPrice:bars[revealed-1]?.c||null,stopDistance,targetDistance});
   $("orderStatus").textContent=(side==="多"?"限價做多":"限價做空")+"已送出："+price+" 點；僅下一根 K 線有效，未觸價即取消。";
   $("limitOrderPrice").value="";
   updateTradeUI();saveReplayState(false);
@@ -553,16 +554,23 @@ function executeLimitEntry(bar,order){
 const originalExecutePendingForLimit=executePending;
 executePending=function(bar){
  const order=pendingOrder;
- if(order&&(order.type==="limitBuy"||order.type==="limitSell")){executeLimitEntry(bar,order);return;}
- originalExecutePendingForLimit(bar);
+ if(order&&(order.type==="limitBuy"||order.type==="limitSell")){executeLimitEntry(bar,order);}
+ else originalExecutePendingForLimit(bar);
+ if(order&&["buy","sell","limitBuy","limitSell"].includes(order.type)){
+  if(position&&position.entryTime===bar.t)recordFormalDecision("entry_order_filled",{direction:position.side,orderType:order.type.startsWith("limit")?"limit":"market",fillPrice:position.entry,stopLoss:position.stopLoss,takeProfit:position.takeProfit,fillTimestamp:bar.t,slippage:position.entry_slippage_breakdown||null});
+  else if(!position&&!pendingOrder&&order.type.startsWith("limit"))recordFormalDecision("entry_order_expired",{direction:order.type==="limitBuy"?"多":"空",orderType:"limit",limitPrice:order.limitPrice,reason:"下一根 K 線未觸價"});
+ }
 };
 const originalPlaceMarketForRisk=placeMarketOrder;
 placeMarketOrder=function(type){
- if(SIM_MODE==="formal"&&!formalRunLock&&(type==="buy"||type==="sell")){$("orderStatus").textContent="請先鎖定正式測試設定，才可進行正式測試下單。";return;}
+ if(SIM_MODE==="formal"&&!formalRunLock&&(type==="buy"||type==="sell")){$("orderStatus").textContent="請先鎖定正式測試設定，才可進行正式測試下單。";return;}if(SIM_MODE==="formal"&&formalRunLock?.completedAt&&(type==="buy"||type==="sell")){$("orderStatus").textContent="正式盲測已完成並封存，禁止新增交易。";return;}
  if((type==="buy"||type==="sell")&&replayRisk.blockedDate===(bars[revealed-1]?.d||replayStartDate)){
   $("orderStatus").textContent="風控已封鎖今日新增進場；仍可管理或平倉既有部位。";return;
  }
- originalPlaceMarketForRisk(type);saveReplayState(false);
+ const priorPending=pendingOrder;
+ originalPlaceMarketForRisk(type);
+ if((type==="buy"||type==="sell")&&pendingOrder&&pendingOrder!==priorPending)recordFormalDecision("entry_order_submitted",{direction:type==="buy"?"多":"空",orderType:"market",decisionPrice:bars[revealed-1]?.c||null,stopDistance:pendingOrder.stopDistance,targetDistance:pendingOrder.targetDistance});
+ saveReplayState(false);
 };
 $("limitBuy").onclick=()=>placeLimitEntry("多");
 $("limitSell").onclick=()=>placeLimitEntry("空");
@@ -751,16 +759,19 @@ checkMargin=function(){
 const originalStopForState=stop;
 stop=function(){originalStopForState();saveReplayState(false);};
 const originalPlayForFormal=play;
-play=function(){if(SIM_MODE==="formal"&&!formalRunLock){alert("請先鎖定正式測試設定，再開始播放。");return;}originalPlayForFormal();};
+play=function(){if(SIM_MODE==="formal"&&!formalRunLock){alert("請先鎖定正式測試設定，再開始播放。");return;}if(SIM_MODE==="formal"&&formalRunLock.completedAt){alert("正式盲測已完成並封存。");return;}originalPlayForFormal();};
 const originalStepForState=step;
 step=function(){
  if(SIM_MODE==="formal"&&!formalRunLock){$("formalLockStatus").textContent="請先鎖定正式測試設定，尚未開始揭露下一根 K 線。";return;}
+ if(SIM_MODE==="formal"&&formalRunLock.completedAt){$("formalLockStatus").textContent="正式盲測已完成並封存，不能重新揭露或更改紀錄。";return;}
+ const pendingBeforeStep=pendingOrder;
  const nextBar=bars[revealed],nextDate=nextBar?.d||null;
  if(nextDate&&replayRisk.tradingDate!==nextDate){
   replayRisk={tradingDate:nextDate,dayStartEquity:accountMetrics().equity,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
  }
  originalStepForState();
  const current=bars[Math.max(0,revealed-1)];
+ if(pendingBeforeStep&&["buy","sell"].includes(pendingBeforeStep.type)&&!pendingOrder&&!position&&revealed>=bars.length)recordFormalDecision("entry_order_cancelled",{orderType:"market",reason:"資料集結束前未成交"});
  if(current)evaluateMarginCall(current);
  if(current&&replayRisk.tradingDate===current.d){
   const equity=accountMetrics().equity;
@@ -768,18 +779,19 @@ step=function(){
   if(replayRisk.dayNet<=-Math.abs(replayRisk.dayStartEquity)*0.04){
    replayRisk.blockedDate=current.d;
    if(!replayRisk.blockReasons.includes("daily_loss_4pct"))replayRisk.blockReasons.push("daily_loss_4pct");
-   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){pendingOrder=null;updateTradeUI();}
+   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){recordFormalDecision("entry_order_cancelled",{orderType:pendingOrder.type,reason:"當日虧損達 4%"});pendingOrder=null;updateTradeUI();}
   }
   if(replayRisk.lossStreak>=12){
    replayRisk.blockedDate=current.d;
    if(!replayRisk.blockReasons.includes("loss_streak_12"))replayRisk.blockReasons.push("loss_streak_12");
-   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){pendingOrder=null;updateTradeUI();}
+   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){recordFormalDecision("entry_order_cancelled",{orderType:pendingOrder.type,reason:"連續虧損達 12 次"});pendingOrder=null;updateTradeUI();}
   }
   const gate=$("riskGateStatus"),status=$("riskStatus");
   const warning=replayRisk.lossStreak>=12?"已封鎖新增進場":replayRisk.lossStreak>=9?"高風險警告":replayRisk.lossStreak>=5?"連虧提醒":"正常";
   if(gate)gate.textContent=replayRisk.blockedDate===current.d?"已封鎖新增進場":warning;
   if(status)status.textContent="交易日 "+current.d+"｜當日損益 "+Math.round(replayRisk.dayNet).toLocaleString("zh-TW")+" 元｜連續虧損 "+replayRisk.lossStreak+" 次｜"+warning+"｜觸發："+(replayRisk.blockReasons.join("、")||"無");
  }
+ if(revealed>=bars.length)sealFormalDecisionLog();
  saveReplayState(false);
 };
 const originalFinishForState=finishPosition;
@@ -793,7 +805,7 @@ finishPosition=function(...args){
  if(replayRisk.lossStreak>=12){
   replayRisk.blockedDate=bars[Math.max(0,revealed-1)]?.d||replayStartDate;
   if(!replayRisk.blockReasons.includes("loss_streak_12"))replayRisk.blockReasons.push("loss_streak_12");
-  if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type))pendingOrder=null;
+  if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){recordFormalDecision("entry_order_cancelled",{orderType:pendingOrder.type,reason:"連續虧損達 12 次"});pendingOrder=null;}
  }
  saveReplayState(false);
 };
