@@ -464,6 +464,12 @@ const REPLAY_STATE_PREFIX="tmf.replay.state."+SIM_MODE+".v1.";
 const REPLAY_BACKUP_INDEX="tmf.replay.backups."+SIM_MODE+".v1";
 let replayDatasetId="unverified", replayStateReady=false, replayRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
 function replayStateKey(date,mode,stamp){return REPLAY_STATE_PREFIX+replayDatasetId+"."+date+"."+mode+"."+(stamp||new Date().toISOString().replace(/[:.]/g,"-"));}
+function replayChecksum(value){
+ const copy={...value};delete copy.checksum;
+ const raw=JSON.stringify(copy);let hash=2166136261;
+ for(let i=0;i<raw.length;i++){hash^=raw.charCodeAt(i);hash=Math.imul(hash,16777619);}
+ return (hash>>>0).toString(16).padStart(8,"0");
+}
 function replayStatePayload(){
  const key=replayStateKey(replayStartDate||$("session").value,replayStartMode||$("replayMode").value);
  return {schema:1,key,mode:SIM_MODE,datasetId:replayDatasetId,session:replayStartDate||$("session").value,replayMode:replayStartMode||$("replayMode").value,
@@ -476,17 +482,20 @@ function validateReplayState(s){
   Number.isInteger(s.selectedIndex)&&s.selectedIndex>=0&&
   s.account&&Number.isFinite(s.account.balance)&&Array.isArray(s.account.ledger)&&
   (s.position===null||(s.position&&["多","空"].includes(s.position.side)&&Number.isSafeInteger(s.position.entry)))&&
-  (s.pendingOrder===null||(s.pendingOrder&&typeof s.pendingOrder.type==="string"));
+  (s.pendingOrder===null||(s.pendingOrder&&typeof s.pendingOrder.type==="string"))&&typeof s.checksum==="string"&&s.checksum===replayChecksum(s);
 }
 function saveReplayState(manual=false){
  if(!replayStartDate||!bars.length)return false;
  try{
-  const snapshot=replayStatePayload(),key=snapshot.key,raw=JSON.stringify(snapshot);
+  const snapshot=replayStatePayload();snapshot.checksum=replayChecksum(snapshot);const key=snapshot.key,raw=JSON.stringify(snapshot);
   localStorage.setItem(key,raw);
   const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]");
   const entry={key,savedAt:snapshot.savedAt,bytes:raw.length,session:snapshot.session,replayMode:snapshot.replayMode};
   index.unshift(entry);
   const unique=index.filter((x,i,a)=>a.findIndex(y=>y.key===x.key&&y.savedAt===x.savedAt)===i).slice(0,60);
+  // Remove only expired snapshots created under this feature's own namespace.
+  const retained=new Set(unique.map(x=>x.key));
+  for(const old of index)if(old&&typeof old.key==="string"&&old.key.startsWith(REPLAY_STATE_PREFIX+replayDatasetId+".")&&!retained.has(old.key))localStorage.removeItem(old.key);
   localStorage.setItem(REPLAY_BACKUP_INDEX,JSON.stringify(unique));
   const status=$("replaySaveStatus");
   if(status)status.textContent=(manual?"已安全保存，可以離開":"自動保存完成")+"｜"+new Date(snapshot.savedAt).toLocaleString("zh-TW")+"｜資料完整性檢查通過";
