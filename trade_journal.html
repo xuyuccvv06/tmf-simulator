@@ -171,7 +171,7 @@ function render(){
    const card=document.createElement("div");card.style.cssText="margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#101923";
    const heading=document.createElement("strong");heading.textContent="交易成本明細";card.append(heading);
    const rows=[
-    ["毛利",money((Number(c.gross_points)||0)*10)],
+    ["滑價前毛利",money((Number(c.gross_before_slippage_points??c.gross_points)||0)*10)],
     ["進場手續費",money(c.entry_commission_twd??(Number(c.commission_twd)||0)/2)],
     ["出場手續費",money(c.exit_commission_twd??(Number(c.commission_twd)||0)/2)],
     ["進場期交稅",money(c.entry_tax_twd??(Number(c.futures_tax_twd)||0)/2)],
