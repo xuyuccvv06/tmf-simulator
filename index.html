@@ -586,7 +586,11 @@ function validateReplayCsvBars(sourceBars){
 }
 function populateDatasetSelector(metadata){
  const select=$("datasetSelector");select.innerHTML="";
- metadata.filter(m=>m.schema_version===2).sort((a,b)=>a.first_timestamp.localeCompare(b.first_timestamp)).forEach(m=>{
+ const valid=metadata.filter(m=>m.schema_version===2&&m.dataset_id&&m.first_timestamp&&m.last_timestamp);
+ if(!valid.some(m=>m.dataset_id===replayDatasetId)&&all.length){
+  valid.push({schema_version:2,dataset_id:replayDatasetId,product_id:"TMFR1",first_timestamp:all[0].t,last_timestamp:all[all.length-1].t,row_count:all.length});
+ }
+ valid.sort((a,b)=>a.first_timestamp.localeCompare(b.first_timestamp)).forEach(m=>{
   const option=document.createElement("option");option.value=m.dataset_id;
   option.textContent=m.product_id+"｜"+m.first_timestamp.slice(0,10)+"～"+m.last_timestamp.slice(0,10)+"｜"+Number(m.row_count).toLocaleString()+" 根";
   select.appendChild(option);
