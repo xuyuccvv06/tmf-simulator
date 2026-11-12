@@ -128,6 +128,31 @@ let all=[], dates=[], bars=[], revealed=0, timer=null, viewStart=0, selectedInde
 let position=null, pendingOrder=null, realizedPoints=0, lastTrade=null;
 const $=id=>document.getElementById(id);
 function setStatus(s){$('status').textContent=s}
+async function saveReplayDatasetToJournalDB(rawText,sourceBars){
+ const dbName="tmf-journal-store-v1",request=indexedDB.open(dbName,2);
+ const journalDB=await new Promise((resolve,reject)=>{
+  request.onupgradeneeded=()=>{const d=request.result;if(!d.objectStoreNames.contains("datasets"))d.createObjectStore("datasets",{keyPath:"dataset_id"});if(!d.objectStoreNames.contains("attachments"))d.createObjectStore("attachments",{keyPath:"attachment_id"});if(!d.objectStoreNames.contains("dataset_chunks")){const st=d.createObjectStore("dataset_chunks",{keyPath:"chunk_id"});st.createIndex("dataset_id","dataset_id",{unique:false});}};
+  request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error("行情備份資料庫正被其他頁面占用"));
+ });
+ try{
+  const hash=[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(rawText)))].map(x=>x.toString(16).padStart(2,"0")).join("");
+  const datasetId="ds_"+hash.slice(0,16),bars=sourceBars.map(x=>({timestamp:new Date(x.t.replace(" ","T")+"+08:00").toISOString(),open:x.o,high:x.h,low:x.l,close:x.c,volume:x.v}));
+  const chunkSize=5000,chunks=[],descriptors=[];
+  for(let i=0;i<bars.length;i+=chunkSize){
+   const part=bars.slice(i,i+chunkSize),chunkIndex=descriptors.length,chunkId=datasetId+"_"+String(chunkIndex).padStart(6,"0");
+   descriptors.push({chunk_id:chunkId,first_timestamp:part[0].timestamp,last_timestamp:part[part.length-1].timestamp,row_count:part.length});
+   chunks.push({chunk_id:chunkId,dataset_id:datasetId,chunk_index:chunkIndex,bars:part});
+  }
+  const meta={dataset_id:datasetId,dataset_sha256:hash,product_id:"TMFR1",timeframe:"5 分鐘",row_count:bars.length,first_timestamp:bars[0].timestamp,last_timestamp:bars[bars.length-1].timestamp,chunks:descriptors};
+  await new Promise((resolve,reject)=>{
+   const tx=journalDB.transaction(["datasets","dataset_chunks"],"readwrite");
+   tx.objectStore("datasets").put({dataset_id:datasetId,meta});
+   const store=tx.objectStore("dataset_chunks");chunks.forEach(chunk=>store.put(chunk));
+   tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error("行情資料集寫入失敗"));tx.onabort=()=>reject(tx.error||new Error("行情資料集寫入中止"));
+  });
+  return {datasetId,rowCount:bars.length,chunkCount:chunks.length};
+ }finally{journalDB.close();}
+}
 function parseCSV(text){
  const lines=text.trim().split(/\r?\n/); const head=lines.shift().split(',');
  const ix=Object.fromEntries(head.map((v,i)=>[v.trim(),i]));
@@ -282,7 +307,7 @@ $('barCursor').oninput=()=>{selectedIndex=+$('barCursor').value;updateSelectedBa
 $('cursorLatest').onclick=()=>{selectedIndex=Math.max(0,revealed-1);$('barCursor').value=selectedIndex;const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);updateSelectedBar();draw(bars.slice(0,revealed));};
 $('buy').onclick=()=>placeMarketOrder('buy');$('sell').onclick=()=>placeMarketOrder('sell');$('close').onclick=()=>placeMarketOrder('close');
 $('step').onclick=step;$('play').onclick=play;$('applyStop').onclick=applyManagedStop;$('applyTarget').onclick=applyManagedTarget;$('reset').onclick=()=>loadDate($('session').value);$('speed').onchange=()=>{if(timer){stop();play()}};$('visible').onchange=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);if(selectedIndex<viewStart)selectedIndex=viewStart;render()};$('latest').onclick=()=>{const n=Math.min(+$('visible').value,revealed);viewStart=Math.max(0,revealed-n);render()};$('session').onchange=()=>loadDate($('session').value);$('replayMode').onchange=()=>loadDate($('session').value);$('newSession').onclick=()=>{const d=dates[Math.floor(Math.random()*dates.length)];$('session').value=d;loadDate(d)};
-async function init(){try{setStatus('正在載入 CSV…');const res=await fetch('./TMFR1_5min_2024-2025.csv');if(!res.ok)throw new Error(`CSV 載入失敗：HTTP ${res.status}`);all=parseCSV(await res.text());if(!all.length)throw new Error('CSV 沒有可用行情');all.sort((a,b)=>a.t.localeCompare(b.t));dates=[...new Set(all.filter(x=>x.t.slice(11,16)>='08:45'&&x.t.slice(11,16)<='13:45').map(x=>x.t.slice(0,10)))].sort();dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;$('session').appendChild(o)});$('session').value=dates[0];loadDate(dates[0]);setStatus(`資料載入完成・${all.length.toLocaleString()} 根`)}catch(e){setStatus('載入失敗');const msg=document.createElement('p');msg.className='note';msg.style.color='#f06468';msg.textContent=e.message+'。請確認 CSV 與 HTML 位於同一個 GitHub Repository 根目錄，並透過 GitHub Pages 網址開啟。';document.querySelector('main').prepend(msg)}}
+async function init(){try{setStatus('正在載入 CSV…');const res=await fetch('./TMFR1_5min_2024-2025.csv');if(!res.ok)throw new Error(`CSV 載入失敗：HTTP ${res.status}`);const rawCsv=await res.text();all=parseCSV(rawCsv);if(!all.length)throw new Error('CSV 沒有可用行情');all.sort((a,b)=>a.t.localeCompare(b.t));let backupSync='';try{const saved=await saveReplayDatasetToJournalDB(rawCsv,all);backupSync=`・完整行情已同步備份（${saved.rowCount.toLocaleString()} 根）`;}catch(syncError){backupSync='・行情備份同步失敗：'+syncError.message;}dates=[...new Set(all.filter(x=>x.t.slice(11,16)>='08:45'&&x.t.slice(11,16)<='13:45').map(x=>x.t.slice(0,10)))].sort();dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;$('session').appendChild(o)});$('session').value=dates[0];loadDate(dates[0]);setStatus(`資料載入完成・${all.length.toLocaleString()} 根${backupSync}`)}catch(e){setStatus('載入失敗');const msg=document.createElement('p');msg.className='note';msg.style.color='#f06468';msg.textContent=e.message+'。請確認 CSV 與 HTML 位於同一個 GitHub Repository 根目錄，並透過 GitHub Pages 網址開啟。';document.querySelector('main').prepend(msg)}}
 init();
 </script>
 </body></html>
