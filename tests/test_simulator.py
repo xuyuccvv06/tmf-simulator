@@ -19,7 +19,7 @@ def test_next_bar_open_and_cost():
     assert trades[0].net_points == pytest.approx(-3.3)
 
 
-def test_slippage_is_adverse_on_both_sides():
+def test_take_profit_limit_fill_does_not_receive_market_slippage():
     bars = make_bars([(100, 101, 99, 100), (100, 104, 99, 103), (103, 106, 102, 105)])
     trade = simulate(
         bars,
@@ -28,8 +28,21 @@ def test_slippage_is_adverse_on_both_sides():
         slippage_points=1,
     )[0]
     assert trade.entry_price == 101
-    assert trade.exit_price == 104  # target 105 less one point exit slippage
-    assert trade.gross_points == 3
+    assert trade.exit_price == 105  # limit target fills at its price, no market slippage
+    assert trade.gross_points == 4
+
+
+def test_target_gap_receives_favorable_price_improvement_without_slippage():
+    bars = make_bars([(100, 101, 99, 100), (100, 104, 99, 103), (107, 108, 106, 107)])
+    trade = simulate(
+        bars,
+        [Order(bars[0].timestamp, "long", target_points=4)],
+        round_trip_cost_points=0,
+        slippage_points=1,
+    )[0]
+    assert trade.exit_reason == "target"
+    assert trade.exit_price == 107
+    assert trade.gross_points == 6
 
 
 def test_stop_gap_fills_at_worse_open():
