@@ -97,7 +97,8 @@ test('formal test requires a locked configuration and seals the append-only deci
   assert.match(html, /正式盲測已完成並封存/);
   assert.match(html, /recordFormalDecision\("entry_order_submitted"/);
   assert.match(html, /recordFormalDecision\("entry_order_filled"/);
-  assert.match(html, /recordFormalDecision\("entry_order_expired"/);\n  assert.match(html, /recordFormalDecision\("position_closed"/);\n  assert.match(html, /recordFormalDecision\("position_stop_modified"/);\n  assert.match(html, /recordFormalDecision\("position_target_modified"/);
+  assert.match(html, /recordFormalDecision\("entry_order_expired"/);
+  assert.match(html, /recordFormalDecision\("position_closed"/);\n  assert.match(html, /recordFormalDecision\("position_stop_modified"/);\n  assert.match(html, /recordFormalDecision\("position_target_modified"/);
   assert.match(html, /if\(revealed>=bars\.length\)sealFormalDecisionLog\(\)/);
 });
 
