@@ -60,3 +60,11 @@ test("backup exports carry mode and imports reject cross-mode restores", () => {
   assert.match(journal, /backupMode!==SIM_MODE/);
   assert.match(journal, /localStorage\.setItem\(ACCOUNT_KEY,JSON\.stringify\(b\.account\)\)/);
 });
+
+
+test("P&L uses Taiwan market red-up green-down convention", () => {
+  assert.match(main, /recordPoints'\)\.style\.color=lastTrade\?\(lastTrade\.points>0\?'#f06468':lastTrade\.points<0\?'#20c887'/);
+  assert.match(main, /accountUnrealized'\)\.style\.color=m\.u>0\?"#f06468":m\.u<0\?"#20c887"/);
+  assert.match(main, /\$\('unrealized'\)\.style\.color=u>0\?'#f06468':u<0\?'#20c887'/);
+  assert.match(journal, /pnl\.style\.color=effective>0\?"#ff8d8d":effective<0\?"#71d6a0"/);
+});
