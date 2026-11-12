@@ -587,7 +587,7 @@ document.querySelector("header h1").insertAdjacentHTML("beforeend",' <span class
 const REPLAY_STATE_PREFIX="tmf.replay.state."+SIM_MODE+".v1.";
 const REPLAY_BACKUP_INDEX="tmf.replay.backups."+SIM_MODE+".v1";
 document.getElementById("formalPerformancePanel").style.display=SIM_MODE==="formal"?"block":"none";
-let replayDatasetId="unverified", replayStateReady=false, marginCall=null, formalRunLock=null, replayRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+let replayDatasetId="unverified", replayStateReady=false, marginCall=null, formalRunLock=null, replayRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[]};
 function replayStateKey(date,mode,stamp){return REPLAY_STATE_PREFIX+replayDatasetId+"."+date+"."+mode+"."+(stamp||new Date().toISOString().replace(/[:.]/g,"-"));}
 function replayChecksum(value){
  const copy={...value};delete copy.checksum;
@@ -711,7 +711,7 @@ loadDate=function(date){
    account=saved&&saved.version===1&&Number.isFinite(saved.balance)&&Array.isArray(saved.ledger)?saved:(hadPriorReplay?freshAccount():account);
   }catch{account=hadPriorReplay?freshAccount():account;}
   saveAccount();
-  replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+  replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[]};
   render();updateTradeUI();
  }
  applyHistoricalMarginForReplayDate(date);
@@ -791,7 +791,7 @@ step=function(){
   const gate=$("riskGateStatus"),status=$("riskStatus");
   const warning=replayRisk.lossStreak>=12?"已封鎖新增進場":replayRisk.lossStreak>=9?"高風險警告":replayRisk.lossStreak>=5?"連虧提醒":"正常";
   if(gate)gate.textContent=replayRisk.blockedDate===current.d?"已封鎖新增進場":warning;
-  if(status)status.textContent="交易日 "+current.d+"｜當日損益 "+Math.round(replayRisk.dayNet).toLocaleString("zh-TW")+" 元｜連續虧損 "+replayRisk.lossStreak+" 次｜"+warning+"｜觸發："+(replayRisk.blockReasons.join("、")||"無");
+  if(status)status.textContent="交易日 "+current.d+"｜當日損益 "+Math.round(replayRisk.dayNet).toLocaleString("zh-TW")+" 元｜連續虧損 "+replayRisk.lossStreak+" 次｜當日獲利回吐 "+Math.round(replayRisk.profitGiveback||0).toLocaleString("zh-TW")+" 元（僅紀錄）｜"+warning+"｜觸發："+(replayRisk.blockReasons.join("、")||"無");
  }
  if(revealed>=bars.length)sealFormalDecisionLog();
  saveReplayState(false);
