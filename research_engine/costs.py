@@ -78,12 +78,19 @@ def dynamic_slippage_points(bars, index: int, config: DynamicSlippageConfig) -> 
     config.validate()
     if index < 0 or index >= len(bars):
         raise IndexError("bar index out of range")
-    bar = bars[index]
-    bar_range = max(0.0, float(bar.high) - float(bar.low))
-    prior = [float(x.volume) for x in bars[max(0, index-config.lookback_bars):index]
-             if isfinite(float(x.volume)) and float(x.volume) > 0]
+    # A fill at the current bar open cannot use that bar's eventual high/low/volume.
+    # Use only the most recently completed bar and volumes strictly before it.
+    if index == 0:
+        bar_range = 0.0
+        current_volume = 0.0
+        prior = []
+    else:
+        completed = bars[index - 1]
+        bar_range = max(0.0, float(completed.high) - float(completed.low))
+        current_volume = float(completed.volume) if isfinite(float(completed.volume)) else 0.0
+        prior = [float(x.volume) for x in bars[max(0, index-config.lookback_bars-1):index-1]
+                 if isfinite(float(x.volume)) and float(x.volume) > 0]
     reference = sorted(prior)[len(prior)//2] if prior else 0.0
-    current_volume = float(bar.volume) if isfinite(float(bar.volume)) else 0.0
     penalty = (config.low_volume_penalty_points
                if reference > 0 and current_volume < reference * config.volume_threshold_ratio else 0.0)
     raw = config.base_points + bar_range * config.range_fraction + penalty
