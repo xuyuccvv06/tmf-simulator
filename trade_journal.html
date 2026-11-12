@@ -166,6 +166,27 @@ function render(){
   if(e.event_type==="exit"&&typeof e.context?.realized_pnl_twd==="number"){const pnl=document.createElement("small");const effectiveResult=effectiveExitPnl(e,es),effectiveCandidate=effectiveResult?.unit==="twd"?effectiveResult.p:e.context.realized_pnl_twd,effective=Number.isFinite(effectiveCandidate)?effectiveCandidate:e.context.realized_pnl_twd;pnl.textContent="原始淨損益："+(e.context.realized_pnl_twd>0?"+":"")+"$"+Number(e.context.realized_pnl_twd).toLocaleString("zh-TW")+(effective!==e.context.realized_pnl_twd?" · 最新修正："+(effective>0?"+":"")+"$"+Number(effective).toLocaleString("zh-TW"):"");pnl.style.color=effective>0?"#ff8d8d":effective<0?"#71d6a0":"#9aaabd";pnl.style.marginTop="6px";d.append(pnl);}
   if(e.event_type==="amendment"&&e.context?.amendment_kind==="pnl_correction"){const cp=document.createElement("small");cp.textContent="損益修正為："+(e.context.corrected_realized_pnl_twd>0?"+":"")+"$"+e.context.corrected_realized_pnl_twd.toLocaleString("zh-TW");cp.style.color="#79b8ff";d.append(cp);}
   const time=document.createElement("small");time.textContent=new Date(e.recorded_at).toLocaleString();d.append(strong,time,p);
+  if(e.event_type==="exit"&&e.context?.simulation_source==="tmf_simulator"&&e.context?.cost_breakdown){
+   const c=e.context.cost_breakdown,money=n=>(Number(n)||0).toLocaleString("zh-TW",{style:"currency",currency:"TWD",maximumFractionDigits:2}),points=n=>(Number(n)||0).toFixed(2)+" 點";
+   const card=document.createElement("div");card.style.cssText="margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#101923";
+   const heading=document.createElement("strong");heading.textContent="交易成本明細";card.append(heading);
+   const rows=[
+    ["滑價前毛利",money((Number(c.gross_before_slippage_points??c.gross_points)||0)*10)],
+    ["進場手續費",money(c.entry_commission_twd??(Number(c.commission_twd)||0)/2)],
+    ["出場手續費",money(c.exit_commission_twd??(Number(c.commission_twd)||0)/2)],
+    ["進場期交稅",money(c.entry_tax_twd??(Number(c.futures_tax_twd)||0)/2)],
+    ["出場期交稅",money(c.exit_tax_twd??(Number(c.futures_tax_twd)||0)/2)],
+    ["進場滑價",points(c.entry_slippage_points)],
+    ["出場滑價",points(c.exit_slippage_points)],
+    ["總成本",money((Number(c.commission_twd)||0)+(Number(c.futures_tax_twd)||0)+((Number(c.entry_slippage_points)||0)+(Number(c.exit_slippage_points)||0))*10)],
+    ["最終淨利",money(c.net_twd)]
+   ];
+   rows.forEach(([label,value],i)=>{const row=document.createElement("div");row.style.cssText="display:flex;justify-content:space-between;gap:12px;margin-top:7px;font-size:13px"+(i===8?";padding-top:8px;border-top:1px solid var(--line);font-weight:700":"");const l=document.createElement("span");l.textContent=label; l.style.color="var(--muted)";const v=document.createElement("strong");v.textContent=value;row.append(l,v);card.append(row);});
+   const slip=document.createElement("div");slip.style.cssText="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)";
+   const entryParts=["進場滑價組成：基礎 "+points(c.entry_slippage_base_points??c.entry_slippage_points)+" · 振幅 "+points(c.entry_slippage_range_points)+" · 低量 "+points(c.entry_slippage_low_volume_points)].join("");
+   const exitParts=["出場滑價組成：基礎 "+points(c.exit_slippage_base_points??c.exit_slippage_points)+" · 振幅 "+points(c.exit_slippage_range_points)+" · 低量 "+points(c.exit_slippage_low_volume_points)].join("");
+   slip.textContent=entryParts+"；"+exitParts+"。舊交易若未保存組成欄位，僅顯示當時保存的總滑價。";card.append(slip);d.append(card);
+  }
   if(e.target_entry_id){const target=document.createElement("small");target.textContent="對應紀錄："+e.target_entry_id;d.append(target);}
   if(!["amendment","void"].includes(e.event_type)&&eventVoided(e.entry_id,es)){const mark=document.createElement("small");mark.textContent="此紀錄已標記作廢，原始內容仍保留";mark.style.color="#ff8d8d";d.append(mark);}
   if(e.market_timestamp){const m=document.createElement("small");m.textContent="行情時間："+e.market_timestamp;d.append(m);}

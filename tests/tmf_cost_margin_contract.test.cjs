@@ -43,10 +43,27 @@ test('unrealized P&L estimates include closing slippage, both-side commission an
 });
 
 test('browser dynamic slippage uses only completed bars before the fill bar', () => {
-  const body = functionBody('estimatedSlippage');
+  const body = functionBody('slippageBreakdown');
   assert.match(body, /priorBars=bars\.slice/);
   assert.match(body, /previousRange/);
   assert.doesNotMatch(body, /bar\.(h|l|v)/);
+  assert.match(functionBody('estimatedSlippage'), /slippageBreakdown\(bar\)\.total/);
+});
+
+
+test('simulation records and journal display itemized fees, tax and slippage components', () => {
+  assert.match(html, /entry_commission_twd:entryCommission/);
+  assert.match(html, /exit_commission_twd:exitCommission/);
+  assert.match(html, /entry_tax_twd:entryTax/);
+  assert.match(html, /exit_tax_twd:exitTax/);
+  assert.match(html, /entry_slippage_range_points:entrySlip\.range/);
+  assert.match(html, /exit_slippage_low_volume_points:exitSlip\.low_volume/);
+  assert.match(html, /gross_before_slippage_points:grossBeforeSlippagePoints/);
+  assert.match(journal, /交易成本明細/);
+  assert.match(journal, /進場手續費/);
+  assert.match(journal, /出場期交稅/);
+  assert.match(journal, /進場滑價組成/);
+  assert.match(journal, /最終淨利/);
 });
 
 test('cost setting rendering does not overwrite a field while the user is editing it', () => {
