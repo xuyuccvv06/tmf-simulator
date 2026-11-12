@@ -166,7 +166,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
 </section>
 <section class="panel">
  <b>版本說明與限制</b>
- <p class="note">目前為市價單測試版：每次固定 1 口，送單後於下一根已揭露 K 線的開盤價成交；可設定停損與停利距離。回放依時間連續跨日期與盤別，持倉不因跨日清空。淨損益計入可調手續費、期交稅及滑價；主畫面保留最近一筆完整交易，詳細行為紀錄請使用獨立頁面。</p>
+ <p class="note">目前支援市價單與限價進場：市價單於下一根已揭露 K 線開盤成交；限價單僅下一根 K 線有效，觸價依限價成交。每次固定 1 口；可設定停損與停利距離。回放依時間連續跨日期與盤別，持倉不因跨日清空。淨損益計入可調手續費、期交稅及滑價；主畫面保留最近一筆完整交易，詳細行為紀錄請使用獨立頁面。</p>
  <p class="note">資料來源：使用者提供的 TMFR1 5 分鐘 CSV。若資料缺少時段，回放會保留實際時間順序，不會補造 K 線。</p>
 </section>
 </main>
@@ -652,7 +652,7 @@ async function init(){
   let backupSync="";
   try{const saved=await saveReplayDatasetToJournalDB(rawCsv,staticBars);backupSync="・完整行情已同步備份（"+saved.rowCount.toLocaleString()+" 根）";}
   catch(syncError){backupSync="・行情備份同步失敗："+syncError.message;}
-  const metadata=await listReplayDatasetsFromJournalDB();
+  let metadata=[];try{metadata=await listReplayDatasetsFromJournalDB();}catch(listError){backupSync+="・資料集清單讀取失敗："+listError.message;}
   populateDatasetSelector(metadata);
   const selected=localStorage.getItem(selectedDatasetStorageKey());
   if(selected&&selected!==staticDatasetId){
