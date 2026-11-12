@@ -108,3 +108,17 @@ test('historical margin lookup is loaded and both controls are wired', () => {
   assert.match(html, /\$\("applyHistoricalMargin"\)\.onclick=applyHistoricalMargin/);
   assert.match(html, /\nloadHistoricalMarginData\(\);\ninit\(\);/);
 });
+
+
+test('TMF execution prices and order levels respect the 1-point minimum tick', () => {
+  assert.match(html, /const TMF_TICK_SIZE=1/);
+  assert.match(html, /function snapPrice\(price\)/);
+  assert.match(functionBody('adverseFill'), /snapPrice\(price\+sign\*slip\)/);
+  assert.match(html, /adverseFill\(fill,side,bar,'entry'\)/);
+  assert.match(html, /total=Math\.ceil\(\(rawTotal-1e-10\)\/TMF_TICK_SIZE\)\*TMF_TICK_SIZE/);
+  assert.match(functionBody('readDistance'), /Number\.isSafeInteger\(value\)/);
+  assert.match(functionBody('applyManagedStop'), /Number\.isSafeInteger\(next\)/);
+  assert.match(functionBody('applyManagedTarget'), /Number\.isSafeInteger\(next\)/);
+  assert.match(functionBody('updateTradeUI'), /Math\.round\(u\)\.toLocaleString/);
+  assert.match(functionBody('updateTradeUI'), /Math\.round\(lastTrade\.points\)\.toLocaleString/);
+});
