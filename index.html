@@ -637,6 +637,7 @@ loadDate=function(date){
   render();updateTradeUI();
  }
  applyHistoricalMarginForReplayDate(date);
+ if(position)checkMargin();
  renderMarginCall();
  replayStateReady=true;
  saveReplayState(false);
