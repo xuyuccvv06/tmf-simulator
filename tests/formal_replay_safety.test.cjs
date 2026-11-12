@@ -49,7 +49,7 @@ test('historical margin is loaded before replay and applied by after-close effec
   assert.match(html, /function applyHistoricalMarginForReplayDate\(date\)/);
   assert.match(html, /r\.effective_date<date/);
   assert.match(html, /account\.initial_margin_per_contract=Number\(row\.initial\)/);
-  assert.match(html, /account\.maintenance_margin_per_contract=Number\(row\.maintenance\)/);
+  assert.match(html, /account\.maintenance_margin_per_contract=Number\(row\.maintenance\)/);\n  assert.match(html, /applyHistoricalMarginForReplayDate\(nextDate\)/);
 });
 
 test('daily profit giveback is tracked for reporting but does not block new trades', () => {
