@@ -703,7 +703,7 @@ function placeLimitEntry(side){
  if(SIM_MODE==="formal"&&!formalRunLock){$("orderStatus").textContent="請先鎖定正式測試設定，才可進行正式測試下單。";return;}if(SIM_MODE==="formal"&&formalRunLock?.completedAt){$("orderStatus").textContent="正式盲測已完成並封存，禁止新增交易。";return;}if(SIM_MODE==="formal"&&formalRunLock.completedAt){$("orderStatus").textContent="正式盲測已完成並封存，禁止新增交易。";return;}
  if(position||pendingOrder){$("orderStatus").textContent="目前已有持倉或待成交委託，請先處理後再送單。";return;}
  if(revealed>=bars.length){$("orderStatus").textContent="本局已結束，無法送單。";return;}
- if(replayRisk.blockedDate===(bars[revealed-1]?.d||replayStartDate)){ $("orderStatus").textContent="風控已封鎖今日新增進場。";return;}
+ if(replayRisk.lossStreak>=12||replayRisk.blockedDate===(bars[revealed-1]?.d||replayStartDate)){ $("orderStatus").textContent="風控已封鎖新增進場。";return;}
  const raw=$("limitOrderPrice").value.trim(),price=Number(raw);
  if(!raw||!Number.isSafeInteger(price)){$("orderStatus").textContent="限價必須是整數點位。";return;}
  try{
