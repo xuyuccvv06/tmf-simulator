@@ -902,8 +902,9 @@ function brokerRiskIndicatorPercent(bar){
  if(!position||!account.initial_margin_per_contract)return null;
  // 永豐公開契約公式；此單一 TMF 模擬未包含選擇權市值與加收保證金。
  const mark=position.side==="多"?bar.l:bar.h;
- const floating=(mark-position.entry)*(position.side==="多"?1:-1)*10;
- const equity=account.balance+floating;
+ const gross=(mark-position.entry)*(position.side==="多"?1:-1)*10;
+ const c=costSettings(),tax=(position.entry+mark)*10*0.00002,commission=2*c.commission_per_side;
+ const equity=account.balance+gross-tax-commission;
  return equity/account.initial_margin_per_contract*100;
 }
 function evaluateBrokerIntradayRisk(bar){
