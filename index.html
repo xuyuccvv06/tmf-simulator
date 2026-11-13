@@ -1087,7 +1087,7 @@ finishPosition=function(...args){
  if(!position){marginCall=null;marginLiquidationPending=false;renderMarginCall();}
  if(delta<0)replayRisk.lossStreak=(replayRisk.lossStreak||0)+1;
  else replayRisk.lossStreak=0; // A non-losing trade breaks a consecutive-loss streak.
- const exitDate=String(args[1]||"").slice(0,10);
+ const exitDate=bars[Math.max(0,revealed-1)]?.d||replayStartDate;
  enforceDailyLossLock(exitDate,priorBalance);
  updateTradeUI();
  if(replayRisk.lossStreak>=12){
@@ -1199,31 +1199,53 @@ window.addEventListener("beforeunload",()=>{stop();saveReplayState(false);});
 
 init();
 
-/* Daily-loss gate UI: make the 4% lock explicit and keep entry controls in sync. */
+/* Daily-loss gate UI: derive the lock from the active replay trading date and current equity. */
 const originalUpdateTradeUIForDailyLoss=updateTradeUI;
 function syncDailyLossGateUI(){
- const date=bars[Math.max(0,revealed-1)]?.d||replayStartDate;
+ const currentBar=bars[Math.max(0,revealed-1)];
+ const date=currentBar?.d||replayStartDate;
+ if(date&&replayRisk.tradingDate===date){
+  const base=Number(replayRisk.dayStartEquity)||0;
+  const deposits=Number(replayRisk.dayDeposits)||0;
+  const equity=accountMetrics().equity;
+  replayRisk.dayNet=equity-base-deposits;
+  replayRisk.dayPeakNet=Math.max(Number(replayRisk.dayPeakNet)||0,replayRisk.dayNet);
+  replayRisk.profitGiveback=Math.max(0,replayRisk.dayPeakNet-replayRisk.dayNet);
+  const limit=Math.abs(base)*0.04;
+  if(limit>0&&replayRisk.dayNet<=-limit){
+   replayRisk.blockedDate=date;
+   if(!Array.isArray(replayRisk.blockReasons))replayRisk.blockReasons=[];
+   if(!replayRisk.blockReasons.includes("daily_loss_4pct"))replayRisk.blockReasons.push("daily_loss_4pct");
+   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){
+    recordFormalDecision("entry_order_cancelled",{orderType:pendingOrder.type,reason:"當日虧損達 4%"});
+    pendingOrder=null;
+   }
+  }
+ }
  const locked=!!date&&replayRisk.blockedDate===date&&
   (replayRisk.blockReasons||[]).includes("daily_loss_4pct");
- for(const id of ["buy","sell","limitBuy","limitSell"]){
-  const button=$(id);if(button)button.disabled=locked;
- }
  const gate=$("riskGateStatus"),status=$("riskStatus");
  if(locked){
   if(gate)gate.textContent="已達每日 4% 虧損上限｜禁止新增進場";
   if(status){
-   const loss=Math.max(0,-(replayRisk.dayNet||0));
-   const base=Math.max(0,replayRisk.dayStartEquity||0);
+   const loss=Math.max(0,-(Number(replayRisk.dayNet)||0));
+   const base=Math.max(0,Number(replayRisk.dayStartEquity)||0);
    const pct=base?((loss/base)*100).toFixed(2):"4.00";
-   status.textContent="每日虧損已達 4% 上限（目前 "+pct+"%／上限 4%），今日禁止新增進場；下一交易日重新計算。既有持倉不會因這項限制自動平倉。";
+   status.textContent="交易日 "+date+"｜每日虧損 "+Math.round(loss).toLocaleString("zh-TW")+" 元（"+pct+"%／上限 4%）｜今日禁止新增進場；下一交易日重新計算。既有持倉與停損停利保留。";
   }
  }else{
-  for(const id of ["buy","sell","limitBuy","limitSell"]){const button=$(id);if(button)button.disabled=!!(position||pendingOrder||revealed>=bars.length);}
-  if(gate&&replayRisk.blockedDate!==date)gate.textContent=(replayRisk.lossStreak||0)>=12?"已封鎖新增進場":(replayRisk.lossStreak||0)>=9?"高風險警告":(replayRisk.lossStreak||0)>=5?"連虧提醒":"正常";
+  if(gate){
+   const reasons=replayRisk.blockReasons||[];
+   gate.textContent=replayRisk.blockedDate===date?"已封鎖新增進場":
+    reasons.includes("loss_streak_12")||replayRisk.lossStreak>=12?"已封鎖新增進場":
+    replayRisk.lossStreak>=9?"高風險警告":replayRisk.lossStreak>=5?"連虧提醒":"正常";
+  }
  }
 }
-updateTradeUI=function(){originalUpdateTradeUIForDailyLoss();syncDailyLossGateUI();};
-
+updateTradeUI=function(){
+ syncDailyLossGateUI();
+ originalUpdateTradeUIForDailyLoss();
+};
 
 /* Restart only the active replay session; keep dataset files and historical journals intact. */
 function restartCurrentReplaySession(){
