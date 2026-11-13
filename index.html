@@ -1166,5 +1166,41 @@ function syncDailyLossGateUI(){
  }
 }
 updateTradeUI=function(){originalUpdateTradeUIForDailyLoss();syncDailyLossGateUI();};
+
+
+/* Restart only the active replay session; keep dataset files and historical journals intact. */
+function restartCurrentReplaySession(){
+ if(SIM_MODE==="formal"&&formalRunLock){
+  alert("正式盲測期間不可重新開始回放，以保護盲測紀錄。");
+  return;
+ }
+ const date=replayStartDate||$("session").value;
+ const mode=replayStartMode||$("replayMode").value;
+ if(!date||!bars.length)return;
+ if((position||pendingOrder)&&!confirm("重新開始會結束目前模擬持倉／取消待成交委託，並將回放進度重設至當日第一根 K 線。帳戶餘額、歷史交易紀錄與原始 K 線資料不會刪除。確定繼續？"))return;
+ stop();
+ // Preserve the exact pre-reset state as a recovery point before creating the new start snapshot.
+ if(replayStateReady){
+  saveReplayState(true);
+  saveAccount();
+ }
+ $("session").value=date;
+ $("replayMode").value=mode;
+ originalLoadDateForState(date);
+ if(replayStartDate!==date||replayStartMode!==mode)return;
+ marginCall=null;
+ replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[],brokerRiskTriggered:false,brokerRiskTriggeredAt:null,brokerRiskPercentAtTrigger:null};
+ replayStateReady=true;
+ applyHistoricalMarginForReplayDate(date);
+ if(position)checkMargin();
+ render();
+ updateTradeUI();
+ renderMarginCall();
+ saveAccount();
+ saveReplayState(false);
+ $("replaySaveStatus").textContent="已重新開始｜回到 "+(bars[0]?.t||date)+"｜原進度備份、交易紀錄與 K 線資料均保留。";
+}
+$("reset").onclick=restartCurrentReplaySession;
+
 </script>
 </body></html>
