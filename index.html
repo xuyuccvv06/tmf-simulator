@@ -507,6 +507,7 @@ function evaluateStops(bar){
  if(targetHit){finishPosition(p.takeProfit,bar.t,'停利','limit');}
 }
 function placeMarketOrder(type){
+ if((type==='buy'||type==='sell')&&replayRisk.blockedDate===(bars[revealed-1]?.d||replayStartDate)){$('orderStatus').textContent='風控已封鎖今日新增進場。';return;}
  if(pendingOrder){$('orderStatus').textContent='已有一筆待成交委託，請先等待下一根 K 線。';return}
  if(revealed>=bars.length){$('orderStatus').textContent='本局已結束，無法送單。';return}
  if(type==='close'&&!position){return}
@@ -556,8 +557,11 @@ function updateTradeUI(){
  $('unrealized').style.color=u>0?'#f06468':u<0?'#20c887':'#edf4fa';
  $('close').disabled=!position||!!pendingOrder;
  if($('cancelPendingOrder'))$('cancelPendingOrder').disabled=!pendingOrder;
- $('buy').disabled=!!position||!!pendingOrder||revealed>=bars.length;
- $('sell').disabled=!!position||!!pendingOrder||revealed>=bars.length;
+ const entryBlocked=replayRisk.blockedDate===(last?.d||replayStartDate);
+ $('buy').disabled=!!position||!!pendingOrder||revealed>=bars.length||entryBlocked;
+ $('sell').disabled=!!position||!!pendingOrder||revealed>=bars.length||entryBlocked;
+ if($('limitBuy'))$('limitBuy').disabled=!!position||!!pendingOrder||revealed>=bars.length||entryBlocked;
+ if($('limitSell'))$('limitSell').disabled=!!position||!!pendingOrder||revealed>=bars.length||entryBlocked;
  $('recordEntryTime').textContent=lastTrade?lastTrade.entryTime.replace('T',' '):'—';
  $('recordEntryPrice').textContent=lastTrade?lastTrade.entry.toLocaleString('en-US'):'—';
  $('recordExitTime').textContent=lastTrade?lastTrade.exitTime.replace('T',' '):'—';
@@ -1020,7 +1024,7 @@ finishPosition=function(...args){
  if(closedPosition)recordFormalDecision("position_closed",{direction:closedPosition.side,entryPrice:closedPosition.entry,entryTimestamp:closedPosition.entryTime,exitPrice:args[0],exitTimestamp:args[1],exitReason:args[2]||"未註明",netPnlTwd:delta});
  if(!position){marginCall=null;marginLiquidationPending=false;renderMarginCall();}
  if(delta<0)replayRisk.lossStreak=(replayRisk.lossStreak||0)+1;
- else if(delta>0)replayRisk.lossStreak=0;
+ else replayRisk.lossStreak=0; // A non-losing trade breaks a consecutive-loss streak.
  if(replayRisk.lossStreak>=12){
   replayRisk.blockedDate=bars[Math.max(0,revealed-1)]?.d||replayStartDate;
   if(!replayRisk.blockReasons.includes("loss_streak_12"))replayRisk.blockReasons.push("loss_streak_12");
