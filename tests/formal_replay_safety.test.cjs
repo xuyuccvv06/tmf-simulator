@@ -52,12 +52,12 @@ test('daily 4 percent loss and 5/9/12 loss warnings enforce the entry gate', () 
   assert.match(html, /dayStartEquity\)\*0\.04/);
   assert.match(html, /equity-replayRisk\.dayStartEquity-\(replayRisk\.dayDeposits\|\|0\)/);
   assert.match(html, /replayRisk\.lossStreak>=5/);
-  assert.match(html, /if\\(\\(type==='buy'\\|\\|type==='sell'\\)\\&\\&replayRisk\\.blockedDate===\\(bars\\[revealed-1\\]\\?\\.d\\|\\|replayStartDate\\)\\)/);
-  assert.match(html, /const entryBlocked=replayRisk\\.blockedDate===\\(last\\?\\.d\\|\\|replayStartDate\\)/);
-  assert.match(html, /\\$\\('limitBuy'\\)\\.disabled=.*entryBlocked/);
+  assert.ok(html.includes(`if((type==='buy'||type==='sell')&&replayRisk.blockedDate===(bars[revealed-1]?.d||replayStartDate))`));
+  assert.ok(html.includes("const entryBlocked=replayRisk.blockedDate===(last?.d||replayStartDate)"));
+  assert.ok(html.includes(`$('limitBuy').disabled=!!position||!!pendingOrder||revealed>=bars.length||entryBlocked`));
   assert.match(html, /replayRisk\.lossStreak>=9/);
   assert.match(html, /replayRisk\.lossStreak>=12/);
-  assert.match(html, /else replayRisk\\.lossStreak=0/);
+  assert.ok(html.includes("else replayRisk.lossStreak=0"));
   assert.match(html, /replayRisk\.blockedDate=current\.d/);
   assert.match(html, /\["buy","sell","limitBuy","limitSell"\]\.includes\(pendingOrder\.type\)/);
   assert.match(html, /風控已封鎖今日新增進場/);
