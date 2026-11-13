@@ -94,7 +94,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
   <div class="stat"><small>帳戶餘額</small><b id="accountBalance">—</b></div><div class="stat"><small>未實現損益</small><b id="accountUnrealized">—</b></div><div class="stat"><small>帳戶權益</small><b id="accountEquity">—</b></div>
   <div class="stat"><small>原始保證金占用</small><b id="accountInitialUsed">—</b></div><div class="stat"><small>維持保證金需求</small><b id="accountMaintenance">—</b></div><div class="stat"><small>可用資金</small><b id="accountAvailable">—</b></div>
  </div>
- <p class="note" id="marginStatus" style="margin-top:9px">保證金狀態：—</p><p class="note" id="marginCallStatus" style="margin-top:6px">目前沒有保證金追繳通知。</p><p class="note" id="brokerRiskNote">盤中風險指標強制平倉門檻尚未設定期貨商契約；本版不套用任意 25% 假設，只模擬期交所歷史保證金與次一營業日 12:00 追繳流程。</p>
+ <p class="note" id="marginStatus" style="margin-top:9px">保證金狀態：—</p><p class="note" id="marginCallStatus" style="margin-top:6px">目前沒有保證金追繳通知。</p><p class="note" id="brokerRiskNote">永豐期貨風控模擬：日盤風險指標低於 25% 時觸發代為沖銷；TMF 夜盤屬豁免商品，不在夜盤執行該項代沖銷。此處以 5 分鐘 K 線不利端估算盤中風險，非逐筆即時風控。</p>
  <div class="trade-record"><div><label for="depositAmount">追加資金（新臺幣）</label><input id="depositAmount" type="number" min="1" step="1" inputmode="numeric" placeholder="輸入入金金額"></div><div style="display:flex;align-items:end"><button id="depositButton" class="primary">確認入金</button></div></div>
  <div class="trade-record"><div><label for="initialMarginInput">每口原始保證金（元）</label><input id="initialMarginInput" type="number" min="1" step="1" inputmode="numeric"></div><div><label for="maintenanceMarginInput">每口維持保證金（元）</label><input id="maintenanceMarginInput" type="number" min="1" step="1" inputmode="numeric"></div><div class="full"><button id="saveMarginSettings">儲存保證金參數</button></div></div>
  <div class="trade-record"><div class="full"><b>期交所歷史保證金查詢（TMF）</b></div><div><label for="marginHistoryDate">查詢日期（當日收盤後）</label><input id="marginHistoryDate" type="date" min="2024-07-29" max="2025-12-31"></div><div style="display:flex;align-items:end"><button id="lookupHistoricalMargin">查詢歷史數值</button></div><div id="historicalMarginResult" class="stat full"><small>查詢結果</small><b>請選擇日期後查詢。</b></div><div class="full"><button id="applyHistoricalMargin" disabled>套用查詢結果的原始／維持保證金</button></div></div>
@@ -346,7 +346,7 @@ function recordFormalDecision(eventType,details={}){
  const key=formalDecisionKey();let log;
  try{log=JSON.parse(localStorage.getItem(key)||"null");}catch{log=null;}
  if(!log)log={schema:1,datasetId:replayDatasetId,events:[],sealed:false};
- if(log.schema!==1||log.datasetId!==replayDatasetId||!Array.isArray(log.events)||(log.checksum&&log.checksum!==formalDecisionChecksum(log.events)))$("formalLockStatus").textContent="正式決策紀錄完整性驗證失敗，已停止寫入以保護原始紀錄。";return;
+ if(log.schema!==1||log.datasetId!==replayDatasetId||!Array.isArray(log.events)||(log.checksum&&log.checksum!==formalDecisionChecksum(log.events))){$("formalLockStatus").textContent="正式決策紀錄完整性驗證失敗，已停止寫入以保護原始紀錄。";return;}
  if(log.sealed)return;
  const last=revealed?bars[revealed-1]:null;
  log.events.push({id:"fd_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,8),eventType,
@@ -360,7 +360,7 @@ function sealFormalDecisionLog(){
  const key=formalDecisionKey();let log;
  try{log=JSON.parse(localStorage.getItem(key)||"null");}catch{log=null;}
  if(!log)log={schema:1,datasetId:replayDatasetId,events:[],sealed:false};
- if(log.schema!==1||log.datasetId!==replayDatasetId||!Array.isArray(log.events)||(log.checksum&&log.checksum!==formalDecisionChecksum(log.events)))$("formalLockStatus").textContent="正式決策紀錄驗證失敗，無法封存；原始紀錄未覆蓋。";return;
+ if(log.schema!==1||log.datasetId!==replayDatasetId||!Array.isArray(log.events)||(log.checksum&&log.checksum!==formalDecisionChecksum(log.events))){$("formalLockStatus").textContent="正式決策紀錄驗證失敗，無法封存；原始紀錄未覆蓋。";return;}
  if(log.sealed)return;
  log.sealed=true;log.sealedAt=new Date().toISOString();log.checksum=formalDecisionChecksum(log.events);
  localStorage.setItem(key,JSON.stringify(log));
@@ -617,7 +617,7 @@ async function switchReplayDataset(datasetId){
   if(!nextDates.length)throw new Error("此資料集沒有可回放的日盤交易日。");
   replayStateReady=false;replayDatasetId=datasetId;all=loaded.bars;dates=nextDates;account=freshAccount();
   position=null;pendingOrder=null;marginCall=null;marginLiquidationPending=false;
-  replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+  replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[],brokerRiskTriggered:false,brokerRiskTriggeredAt:null,brokerRiskPercentAtTrigger:null};
   populateReplaySessions();
   localStorage.setItem(selectedDatasetStorageKey(),datasetId);
   loadFormalLockForDataset();
@@ -832,7 +832,7 @@ function restoreReplayState(date,mode){
   revealed=s.revealed;selectedIndex=Math.min(s.selectedIndex,Math.max(0,revealed-1));
   viewStart=Math.max(0,Math.min(s.viewStart,Math.max(0,revealed-1)));
   position=s.position;pendingOrder=s.pendingOrder;realizedPoints=s.realizedPoints;
-  lastTrade=s.lastTrade;account=s.account;marginLiquidationPending=false;marginCall=s.marginCall||null;
+  lastTrade=s.lastTrade;account=s.account;marginLiquidationPending=!!s.marginLiquidationPending;marginCall=s.marginCall||null;
   replayRisk=s.replayRisk||replayRisk;
   saveAccount();render();updateTradeUI();renderMarginCall();
   $("replaySaveStatus").textContent="已恢復備份｜"+new Date(s.savedAt).toLocaleString("zh-TW")+"｜完整性檢查通過";
@@ -876,7 +876,7 @@ loadDate=function(date){
    account=saved&&saved.version===1&&Number.isFinite(saved.balance)&&Array.isArray(saved.ledger)?saved:(hadPriorReplay?freshAccount():account);
   }catch{account=hadPriorReplay?freshAccount():account;}
   saveAccount();
-  replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+  replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[],brokerRiskTriggered:false,brokerRiskTriggeredAt:null,brokerRiskPercentAtTrigger:null};
   render();updateTradeUI();
  }
  applyHistoricalMarginForReplayDate(date);
@@ -893,6 +893,35 @@ function renderMarginCall(){
  const remain=current&&marginCall.deadline?Math.max(0,Date.parse(marginCall.deadline.replace(" ","T")+":00+08:00")-Date.parse(current.replace(" ","T")+"+08:00")):null;
  const countdown=remain===null?"資料集未涵蓋下一交易日，期限無法在本資料中模擬":("模擬剩餘 "+Math.floor(remain/3600000)+" 小時 "+Math.floor((remain%3600000)/60000)+" 分");
  el.textContent="保證金追繳中｜補足至原始保證金尚需 "+money(amount)+"｜期限 "+(marginCall.deadline||"待下一交易日資料")+"｜"+countdown+"。期限前可追加資金或自行平倉；目前固定 1 口，無法做部分口數減倉。";
+}
+function isTMFDaySession(bar){
+ const hhmm=bar?.t?.slice(11,16)||"";
+ return hhmm>="08:45"&&hhmm<="13:45";
+}
+function brokerRiskIndicatorPercent(bar){
+ if(!position||!account.initial_margin_per_contract)return null;
+ // 永豐公開契約公式；此單一 TMF 模擬未包含選擇權市值與加收保證金。
+ const mark=position.side==="多"?bar.l:bar.h;
+ const floating=(mark-position.entry)*(position.side==="多"?1:-1)*10;
+ const equity=account.balance+floating;
+ return equity/account.initial_margin_per_contract*100;
+}
+function evaluateBrokerIntradayRisk(bar){
+ if(!position||!isTMFDaySession(bar)||replayRisk.brokerRiskTriggered)return;
+ const ratio=brokerRiskIndicatorPercent(bar);
+ if(ratio===null||!Number.isFinite(ratio)||ratio>=25)return;
+ replayRisk.brokerRiskTriggered=true;
+ replayRisk.brokerRiskTriggeredAt=bar.t;
+ replayRisk.brokerRiskPercentAtTrigger=ratio;
+ replayRisk.blockedDate=bar.d;
+ if(!replayRisk.blockReasons.includes("sinopac_risk_indicator_below_25pct"))replayRisk.blockReasons.push("sinopac_risk_indicator_below_25pct");
+ marginLiquidationPending=true;
+ if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){
+  recordFormalDecision("entry_order_cancelled",{orderType:pendingOrder.type,reason:"永豐風險指標低於 25%"});
+  pendingOrder=null;
+ }
+ $("orderStatus").textContent="永豐盤中風險指標 "+ratio.toFixed(2)+"% 低於 25%，已觸發代為沖銷；將於下一根可用 K 線開盤模擬強制平倉。";
+ updateTradeUI();
 }
 function evaluateMarginCall(bar){
  if(!position){marginCall=null;marginLiquidationPending=false;renderMarginCall();return;}
@@ -935,11 +964,12 @@ step=function(){
  const nextBar=bars[revealed],nextDate=nextBar?.d||null;
  if(nextDate&&replayRisk.tradingDate!==nextDate){
   applyHistoricalMarginForReplayDate(nextDate);
-  replayRisk={tradingDate:nextDate,dayStartEquity:accountMetrics().equity,dayNet:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[]};
+  replayRisk={tradingDate:nextDate,dayStartEquity:accountMetrics().equity,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[],brokerRiskTriggered:false,brokerRiskTriggeredAt:null,brokerRiskPercentAtTrigger:null};
  }
  originalStepForState();
  const current=bars[Math.max(0,revealed-1)];
  if(pendingBeforeStep&&["buy","sell"].includes(pendingBeforeStep.type)&&!pendingOrder&&!position&&revealed>=bars.length)recordFormalDecision("entry_order_cancelled",{orderType:"market",reason:"資料集結束前未成交"});
+ if(current)evaluateBrokerIntradayRisk(current);
  if(current)evaluateMarginCall(current);
  if(current&&replayRisk.tradingDate===current.d){
   const equity=accountMetrics().equity;
