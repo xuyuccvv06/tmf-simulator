@@ -941,7 +941,8 @@ loadDate=function(date){
 };
 function renderMarginCall(){
  const el=$("marginCallStatus");if(!el)return;
- if(!marginCall||!position){el.textContent="目前沒有保證金追繳通知。";return;}
+ if(marginLiquidationPending&&position){el.textContent="保證金風險處置中｜已排定下一根可用 K 線開盤模擬強制平倉。";return;}
+ if(!marginCall||!position){el.textContent="保證金狀態正常｜目前沒有追繳通知。";return;}
  const equity=accountMetrics().equity,required=account.initial_margin_per_contract*1,amount=Math.max(0,required-equity);
  const current=bars[Math.max(0,revealed-1)]?.t;
  const remain=current&&marginCall.deadline?Math.max(0,Date.parse(marginCall.deadline.replace(" ","T")+":00+08:00")-Date.parse(current.replace(" ","T")+"+08:00")):null;
@@ -967,6 +968,7 @@ function evaluateBrokerIntradayRisk(bar){
  if(ratio===null||!Number.isFinite(ratio)||ratio>=25)return;
  replayRisk.brokerRiskTriggered=true;
  replayRisk.brokerRiskTriggeredAt=bar.t;
+ showRiskPopupOnce("broker-risk-"+bar.d,"保證金／風險指標警告","永豐盤中風險指標已低於 25%。系統已觸發代為沖銷，將於下一根可用 K 線開盤模擬強制平倉。");
  replayRisk.brokerRiskPercentAtTrigger=ratio;
  replayRisk.blockedDate=bar.d;
  if(!replayRisk.blockReasons.includes("sinopac_risk_indicator_below_25pct"))replayRisk.blockReasons.push("sinopac_risk_indicator_below_25pct");
@@ -986,6 +988,7 @@ function evaluateMarginCall(bar){
  if(!marginCall&&isTMFDaySession(bar)&&bar.t.slice(11,16)==="13:45"&&m.equity<m.maintenance){
   const next=dates.find(d=>d>bar.d);
   marginCall={triggeredAt:bar.t,deadline:next?next+" 12:00":null,tradingDate:bar.d};
+  showRiskPopupOnce("margin-call-"+bar.d,"保證金追繳通知","交易日："+bar.d+"\\n權益低於維持保證金，請於期限前補足至原始保證金或自行平倉。");
  }
  if(marginCall&&m.equity>=m.initialUsed){marginCall=null;renderMarginCall();return;}
  if(marginCall&&marginCall.deadline&&Date.parse(bar.t.replace(" ","T")+"+08:00")>=Date.parse(marginCall.deadline.replace(" ","T")+":00+08:00")){
@@ -1004,6 +1007,7 @@ checkMargin=function(){
  if(!marginCall&&last&&isTMFDaySession(last)&&last.t.slice(11,16)==="13:45"&&m.equity<m.maintenance){
   const next=dates.find(d=>d>last.d);
   marginCall={triggeredAt:last.t,deadline:next?next+" 12:00":null,tradingDate:last.d};
+  showRiskPopupOnce("margin-call-"+last.d,"保證金追繳通知","交易日："+last.d+"\\n權益低於維持保證金，請於期限前補足至原始保證金或自行平倉。");
  }
  marginLiquidationPending=false;
  renderMarginCall();
@@ -1052,6 +1056,11 @@ step=function(){
  updateTradeUI();
  saveReplayState(false);
 };
+function showRiskPopupOnce(key,title,message){
+ const storageKey="tmf.risk.popup."+SIM_MODE+"."+replayDatasetId+"."+key;
+ try{if(localStorage.getItem(storageKey)==="shown")return;localStorage.setItem(storageKey,"shown");}catch{}
+ alert(title+"\\n"+message);
+}
 function enforceDailyLossLock(currentDate, fallbackStartEquity=null){
  if(!currentDate)return false;
  if(replayRisk.tradingDate!==currentDate){
@@ -1069,6 +1078,7 @@ function enforceDailyLossLock(currentDate, fallbackStartEquity=null){
  const limit=Math.abs(replayRisk.dayStartEquity||0)*0.04;
  if(limit>0&&replayRisk.dayNet<=-limit){
   replayRisk.blockedDate=currentDate;
+  showRiskPopupOnce("daily-loss-4pct-"+currentDate,"已達每日 4% 虧損上限","交易日："+currentDate+"\\n當日虧損："+Math.round(Math.max(0,-replayRisk.dayNet)).toLocaleString("zh-TW")+" 元\\n已禁止新增進場；既有持倉與停損停利仍依原規則處理。");
   if(!replayRisk.blockReasons.includes("daily_loss_4pct"))replayRisk.blockReasons.push("daily_loss_4pct");
   if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){
    recordFormalDecision("entry_order_cancelled",{orderType:pendingOrder.type,reason:"當日虧損達 4%"});
@@ -1085,8 +1095,15 @@ finishPosition=function(...args){
  const delta=account.balance-priorBalance;
  if(closedPosition)recordFormalDecision("position_closed",{direction:closedPosition.side,entryPrice:closedPosition.entry,entryTimestamp:closedPosition.entryTime,exitPrice:args[0],exitTimestamp:args[1],exitReason:args[2]||"未註明",netPnlTwd:delta});
  if(!position){marginCall=null;marginLiquidationPending=false;renderMarginCall();}
- if(delta<0)replayRisk.lossStreak=(replayRisk.lossStreak||0)+1;
+ const previousLossStreak=replayRisk.lossStreak||0;
+ if(delta<0)replayRisk.lossStreak=previousLossStreak+1;
  else replayRisk.lossStreak=0; // A non-losing trade breaks a consecutive-loss streak.
+ const reachedLossMilestone=delta<0?[5,9,12].find(n=>previousLossStreak<n&&replayRisk.lossStreak>=n):null;
+ if(reachedLossMilestone){
+  const title=reachedLossMilestone===12?"連續虧損風控鎖定":reachedLossMilestone===9?"連續虧損高風險警告":"連續虧損提醒";
+  const detail=reachedLossMilestone===12?"已達 12 次，系統將禁止新增進場。":reachedLossMilestone===9?"已達 9 次，請特別留意風險。":"已達 5 次，請留意連續虧損。";
+  showRiskPopupOnce("loss-streak-"+replayRisk.lossStreak,title,"目前連續虧損："+replayRisk.lossStreak+" 次\\n"+detail);
+ }
  const exitDate=bars[Math.max(0,revealed-1)]?.d||replayStartDate;
  enforceDailyLossLock(exitDate,priorBalance);
  updateTradeUI();
@@ -1214,6 +1231,7 @@ function syncDailyLossGateUI(){
   const limit=Math.abs(base)*0.04;
   if(limit>0&&replayRisk.dayNet<=-limit){
    replayRisk.blockedDate=date;
+   showRiskPopupOnce("daily-loss-4pct-"+date,"已達每日 4% 虧損上限","交易日："+date+"\\n當日虧損："+Math.round(Math.max(0,-replayRisk.dayNet)).toLocaleString("zh-TW")+" 元\\n已禁止新增進場；既有持倉與停損停利仍依原規則處理。");
    if(!Array.isArray(replayRisk.blockReasons))replayRisk.blockReasons=[];
    if(!replayRisk.blockReasons.includes("daily_loss_4pct"))replayRisk.blockReasons.push("daily_loss_4pct");
    if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){
