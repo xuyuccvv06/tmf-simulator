@@ -938,10 +938,10 @@ function evaluateMarginCall(bar){
  if(!position){marginCall=null;marginLiquidationPending=false;renderMarginCall();return;}
  const m=accountMetrics();
  if(!account.initial_margin_per_contract||!account.maintenance_margin_per_contract){renderMarginCall();return;}
- if(!marginCall&&m.equity<m.maintenance){
+ // 追繳依一般交易時段收盤後的保證金餘額判定；盤中即時強平另由永豐 25% 風險指標處理。
+ if(!marginCall&&isTMFDaySession(bar)&&bar.t.slice(11,16)==="13:45"&&m.equity<m.maintenance){
   const next=dates.find(d=>d>bar.d);
-  if(next)marginCall={triggeredAt:bar.t,deadline:next+" 12:00",tradingDate:bar.d};
-  else marginCall={triggeredAt:bar.t,deadline:null,tradingDate:bar.d};
+  marginCall={triggeredAt:bar.t,deadline:next?next+" 12:00":null,tradingDate:bar.d};
  }
  if(marginCall&&m.equity>=m.initialUsed){marginCall=null;renderMarginCall();return;}
  if(marginCall&&marginCall.deadline&&Date.parse(bar.t.replace(" ","T")+"+08:00")>=Date.parse(marginCall.deadline.replace(" ","T")+":00+08:00")){
@@ -955,11 +955,12 @@ checkMargin=function(){
  if(!position){marginCall=null;marginLiquidationPending=false;return;}
  const m=accountMetrics();
  if(!account.initial_margin_per_contract||!account.maintenance_margin_per_contract)return;
- if(!marginCall&&m.equity<m.maintenance){
-  const last=bars[Math.max(0,revealed-1)];
-  if(last){const next=dates.find(d=>d>last.d);marginCall={triggeredAt:last.t,deadline:next?next+" 12:00":null,tradingDate:last.d};}
- }
  if(marginCall&&m.equity>=m.initialUsed)marginCall=null;
+ const last=bars[Math.max(0,revealed-1)];
+ if(!marginCall&&last&&isTMFDaySession(last)&&last.t.slice(11,16)==="13:45"&&m.equity<m.maintenance){
+  const next=dates.find(d=>d>last.d);
+  marginCall={triggeredAt:last.t,deadline:next?next+" 12:00":null,tradingDate:last.d};
+ }
  marginLiquidationPending=false;
  renderMarginCall();
 };
