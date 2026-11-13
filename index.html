@@ -1141,5 +1141,30 @@ window.addEventListener("pagehide",()=>{stop();saveReplayState(false);});
 window.addEventListener("beforeunload",()=>{stop();saveReplayState(false);});
 
 init();
+
+/* Daily-loss gate UI: make the 4% lock explicit and keep entry controls in sync. */
+const originalUpdateTradeUIForDailyLoss=updateTradeUI;
+function syncDailyLossGateUI(){
+ const date=bars[Math.max(0,revealed-1)]?.d||replayStartDate;
+ const locked=!!date&&replayRisk.blockedDate===date&&
+  (replayRisk.blockReasons||[]).includes("daily_loss_4pct");
+ for(const id of ["buy","sell","limitBuy","limitSell"]){
+  const button=$(id);if(button)button.disabled=locked;
+ }
+ const gate=$("riskGateStatus"),status=$("riskStatus");
+ if(locked){
+  if(gate)gate.textContent="已達每日 4% 虧損上限｜禁止新增進場";
+  if(status){
+   const loss=Math.max(0,-(replayRisk.dayNet||0));
+   const base=Math.max(0,replayRisk.dayStartEquity||0);
+   const pct=base?((loss/base)*100).toFixed(2):"4.00";
+   status.textContent="每日虧損已達 4% 上限（目前 "+pct+"%／上限 4%），今日禁止新增進場；下一交易日重新計算。既有持倉不會因這項限制自動平倉。";
+  }
+ }else{
+  for(const id of ["buy","sell","limitBuy","limitSell"]){const button=$(id);if(button)button.disabled=!!(position||pendingOrder||revealed>=bars.length);}
+  if(gate&&replayRisk.blockedDate!==date)gate.textContent=(replayRisk.lossStreak||0)>=12?"已封鎖新增進場":(replayRisk.lossStreak||0)>=9?"高風險警告":(replayRisk.lossStreak||0)>=5?"連虧提醒":"正常";
+ }
+}
+updateTradeUI=function(){originalUpdateTradeUIForDailyLoss();syncDailyLossGateUI();};
 </script>
 </body></html>
