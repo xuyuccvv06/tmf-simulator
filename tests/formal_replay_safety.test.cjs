@@ -52,8 +52,8 @@ test('daily 4 percent loss and 5/9/12 loss warnings enforce the entry gate', () 
   assert.match(html, /dayStartEquity\)\*0\.04/);
   assert.match(html, /equity-replayRisk\.dayStartEquity-\(replayRisk\.dayDeposits\|\|0\)/);
   assert.match(html, /replayRisk\.lossStreak>=5/);
-  assert.ok(html.includes(`if((type==='buy'||type==='sell')&&replayRisk.blockedDate===(bars[revealed-1]?.d||replayStartDate))`));
-  assert.ok(html.includes("const entryBlocked=replayRisk.blockedDate===(last?.d||replayStartDate)"));
+  assert.ok(html.includes(`if((type==='buy'||type==='sell')&&(replayRisk.lossStreak>=12||replayRisk.blockedDate===(bars[revealed-1]?.d||replayStartDate)))`));
+  assert.ok(html.includes("const entryBlocked=replayRisk.lossStreak>=12||replayRisk.blockedDate===(last?.d||replayStartDate)"));
   assert.ok(html.includes(`$('limitBuy').disabled=!!position||!!pendingOrder||revealed>=bars.length||entryBlocked`));
   assert.match(html, /replayRisk\.lossStreak>=9/);
   assert.match(html, /replayRisk\.lossStreak>=12/);
