@@ -985,7 +985,7 @@ step=function(){
  const nextBar=bars[revealed],nextDate=nextBar?.d||null;
  if(nextDate&&replayRisk.tradingDate!==nextDate){
   applyHistoricalMarginForReplayDate(nextDate);
-  replayRisk={tradingDate:nextDate,dayStartEquity:accountMetrics().equity,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[],brokerRiskTriggered:false,brokerRiskTriggeredAt:null,brokerRiskPercentAtTrigger:null};
+  replayRisk={tradingDate:nextDate,dayStartEquity:accountMetrics().equity,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:replayRisk.lossStreak||0,blockedDate:null,blockReasons:[],brokerRiskTriggered:false,brokerRiskTriggeredAt:null,brokerRiskPercentAtTrigger:null};
  }
  originalStepForState();
  const current=bars[Math.max(0,revealed-1)];
