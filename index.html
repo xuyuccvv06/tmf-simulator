@@ -422,7 +422,12 @@ function draw(data){const cv=$('chart'),ctx=cv.getContext('2d'),w=cv.width,h=cv.
  const selectedLocal=selectedIndex-viewStart;
  if(selectedLocal>=0&&selectedLocal<a.length){const sx=left+selectedLocal*step+step/2,sy=yv(a[selectedLocal].c);ctx.save();ctx.strokeStyle='#f5c451';ctx.lineWidth=1.5;ctx.setLineDash([6,5]);ctx.beginPath();ctx.moveTo(sx,top);ctx.lineTo(sx,top+ph);ctx.moveTo(left,sy);ctx.lineTo(w-right,sy);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#f5c451';ctx.beginPath();ctx.arc(sx,sy,4,0,Math.PI*2);ctx.fill();ctx.restore()}
  ctx.fillStyle='#9aabba';ctx.fillText(a[0].t.slice(11,16),left,h-7);ctx.fillText(a[a.length-1].t.slice(11,16),w-62,h-7)}
-function step(){if(revealed<bars.length){const n=Math.min(+$('visible').value,revealed),wasAtLatest=viewStart>=Math.max(0,revealed-n),cursorWasLatest=selectedIndex===revealed-1;const nextBar=bars[revealed];revealed++;if(marginLiquidationPending&&position&&isTMFDaySession(nextBar)){finishPosition(nextBar.o,nextBar.t,'永豐日盤風險指標觸發代為沖銷');marginLiquidationPending=false;}if(pendingOrder)executePending(nextBar);if(position)evaluateStops(nextBar);if(position)checkMargin();if(wasAtLatest)viewStart=Math.max(0,revealed-Math.min(+$('visible').value,revealed));if(cursorWasLatest)selectedIndex=revealed-1;render();updateTradeUI()}if(revealed>=bars.length){stop();setStatus(position?'已到資料集最後一根 K 線；未平倉部位保留，沒有後續行情可供撮合。':'連續回放已到資料集最後一根 K 線。');if(pendingOrder){$('orderStatus').textContent='資料集已結束，未成交委託已取消；未平倉部位不受影響。';pendingOrder=null;updateTradeUI()}}}
+function step(){if(revealed<bars.length){const n=Math.min(+$('visible').value,revealed),wasAtLatest=viewStart>=Math.max(0,revealed-n),cursorWasLatest=selectedIndex===revealed-1;const nextBar=bars[revealed];revealed++;if(marginLiquidationPending&&position&&isTMFDaySession(nextBar)){
+ finishPosition(nextBar.o,nextBar.t,'永豐日盤風險指標觸發代為沖銷');
+ marginLiquidationPending=false;
+ replayRisk.blockedDate=nextBar.d;
+ if(!replayRisk.blockReasons.includes("broker_forced_liquidation"))replayRisk.blockReasons.push("broker_forced_liquidation");
+}if(pendingOrder)executePending(nextBar);if(position)evaluateStops(nextBar);if(position)checkMargin();if(wasAtLatest)viewStart=Math.max(0,revealed-Math.min(+$('visible').value,revealed));if(cursorWasLatest)selectedIndex=revealed-1;render();updateTradeUI()}if(revealed>=bars.length){stop();setStatus(position?'已到資料集最後一根 K 線；未平倉部位保留，沒有後續行情可供撮合。':'連續回放已到資料集最後一根 K 線。');if(pendingOrder){$('orderStatus').textContent='資料集已結束，未成交委託已取消；未平倉部位不受影響。';pendingOrder=null;updateTradeUI()}}}
 function readDistance(id){
  const raw=$(id).value.trim();
  if(!raw)return null;
