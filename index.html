@@ -887,6 +887,33 @@ loadDate=function(date){
   account=freshAccount();localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));
   localStorage.setItem("tmf.practice.reset-to-50000.v1","done");
  }
+ if(SIM_MODE==="practice"&&localStorage.getItem("tmf.practice.account-reset-v2")!=="done"){
+  // One-time migration: reset practice account snapshots to 50k without deleting replay progress or trade journal.
+  const resetAccount=freshAccount();
+  const resetRisk={tradingDate:null,dayStartEquity:50000,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[],brokerRiskTriggered:false,brokerRiskTriggeredAt:null,brokerRiskPercentAtTrigger:null};
+  localStorage.setItem(ACCOUNT_KEY,JSON.stringify(resetAccount));
+  localStorage.setItem("tmf.sim.account.v1",JSON.stringify(resetAccount));
+  for(let i=0;i<localStorage.length;i++){
+   const key=localStorage.key(i);if(!key)continue;
+   if(key.startsWith("tmf.sim.account.dataset.practice.v1.")){
+    try{const saved=JSON.parse(localStorage.getItem(key)||"null");if(saved&&saved.version===1&&Array.isArray(saved.ledger))localStorage.setItem(key,JSON.stringify(resetAccount));}catch{}
+   }
+   if(key.startsWith(REPLAY_STATE_PREFIX+replayDatasetId+".")){
+    try{
+     const snapshot=JSON.parse(localStorage.getItem(key)||"null");
+     if(snapshot&&snapshot.schema===1&&snapshot.mode==="practice"&&snapshot.datasetId===replayDatasetId&&snapshot.account){
+      snapshot.account=JSON.parse(JSON.stringify(resetAccount));
+      snapshot.replayRisk=JSON.parse(JSON.stringify(resetRisk));
+      snapshot.checksum=replayChecksum(snapshot);
+      localStorage.setItem(key,JSON.stringify(snapshot));
+     }
+    }catch{}
+   }
+  }
+  account=resetAccount;
+  replayRisk=resetRisk;
+  localStorage.setItem("tmf.practice.account-reset-v2","done");
+ }
  if(SIM_MODE==="formal"&&formalRunLock&&(date!==formalRunLock.startDate||requestedMode!==formalRunLock.replayMode)){alert("正式盲測已鎖定，不可更改起始日期或交易時段。");$("session").value=formalRunLock.startDate;$("replayMode").value=formalRunLock.replayMode;return;}
  if(replayStateReady){
   saveReplayState(false);
