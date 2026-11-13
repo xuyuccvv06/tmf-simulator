@@ -88,6 +88,8 @@ test('broker-specific intraday risk liquidation is not guessed without a confirm
 
 test('margin calls persist to the next trading-day noon and are included in snapshots', () => {
   assert.match(html, /function evaluateMarginCall\(bar\)/);
+  assert.match(html, /isTMFDaySession\(bar\)&&bar\.t\.slice\(11,16\)==="13:45"/);
+  assert.match(html, /isTMFDaySession\(last\)&&last\.t\.slice\(11,16\)==="13:45"/);
   assert.match(html, /dates\.find\(d=>d>bar\.d\)/);
   assert.match(html, /deadline:next\+" 12:00"/);
   assert.match(html, /保證金追繳期限屆滿強制平倉/);
