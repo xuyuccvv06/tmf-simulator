@@ -70,7 +70,7 @@ label{color:var(--muted);font-size:12px}select{padding:9px}
  </div>
  <div class="trade-record" style="margin-top:8px">
   <div class="full"><label for="limitOrderPrice">限價進場價格（整數點）</label><input id="limitOrderPrice" type="number" step="1" inputmode="numeric" placeholder="輸入限價價格"></div>
-  <div class="row full"><button id="limitBuy">限價做多</button><button id="limitSell">限價做空</button></div>
+  <div class="row full"><button id="limitBuy">限價做多</button><button id="limitSell">限價做空</button><button id="cancelPendingOrder" disabled>取消待成交委託</button></div>
  </div>
  <div class="row" style="margin-top:10px">
   <button id="buy" class="primary">市價做多</button>
@@ -550,6 +550,7 @@ function updateTradeUI(){
  $('unrealized').textContent=(u>=0?'+':'')+Math.round(u).toLocaleString('en-US');
  $('unrealized').style.color=u>0?'#f06468':u<0?'#20c887':'#edf4fa';
  $('close').disabled=!position||!!pendingOrder;
+ if($('cancelPendingOrder'))$('cancelPendingOrder').disabled=!pendingOrder;
  $('buy').disabled=!!position||!!pendingOrder||revealed>=bars.length;
  $('sell').disabled=!!position||!!pendingOrder||revealed>=bars.length;
  $('recordEntryTime').textContent=lastTrade?lastTrade.entryTime.replace('T',' '):'—';
@@ -681,6 +682,14 @@ async function init(){
 }
 
 /* One-bar limit-entry orders: checked only against the next revealed bar, then expire. */
+function cancelPendingEntryOrder(){
+ if(!pendingOrder){$("orderStatus").textContent="目前沒有待成交委託。";return;}
+ const cancelled={...pendingOrder};
+ recordFormalDecision("entry_order_cancelled",{orderType:cancelled.type,limitPrice:cancelled.limitPrice??null,reason:"使用者手動取消"});
+ pendingOrder=null;
+ $("orderStatus").textContent="待成交委託已取消，可以重新提交新單。";
+ updateTradeUI();saveReplayState(false);
+}
 function placeLimitEntry(side){
  if(SIM_MODE==="formal"&&!formalRunLock){$("orderStatus").textContent="請先鎖定正式測試設定，才可進行正式測試下單。";return;}if(SIM_MODE==="formal"&&formalRunLock?.completedAt){$("orderStatus").textContent="正式盲測已完成並封存，禁止新增交易。";return;}if(SIM_MODE==="formal"&&formalRunLock.completedAt){$("orderStatus").textContent="正式盲測已完成並封存，禁止新增交易。";return;}
  if(position||pendingOrder){$("orderStatus").textContent="目前已有持倉或待成交委託，請先處理後再送單。";return;}
@@ -728,6 +737,7 @@ placeMarketOrder=function(type){
  if((type==="buy"||type==="sell")&&pendingOrder&&pendingOrder!==priorPending)recordFormalDecision("entry_order_submitted",{direction:type==="buy"?"多":"空",orderType:"market",decisionPrice:bars[revealed-1]?.c||null,stopDistance:pendingOrder.stopDistance,targetDistance:pendingOrder.targetDistance});
  saveReplayState(false);
 };
+$("cancelPendingOrder").onclick=cancelPendingEntryOrder;
 $("limitBuy").onclick=()=>placeLimitEntry("多");
 $("limitSell").onclick=()=>placeLimitEntry("空");
 
