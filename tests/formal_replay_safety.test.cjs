@@ -40,6 +40,9 @@ test('manual save, rolling versions, recovery selection and pause lifecycle are 
 
 test('limit entries only evaluate the next revealed bar and expire after a miss', () => {
   assert.match(html, /expiresAfterNextBar:true/);
+  assert.match(html, /id="cancelPendingOrder"/);
+  assert.match(html, /function cancelPendingEntryOrder\(\)/);
+  assert.match(html, /使用者手動取消/);
   assert.match(html, /bar\.l<=order\.limitPrice&&bar\.h>=order\.limitPrice/);
   assert.match(html, /限價委託未成交：下一根 K 線未觸及/);
   assert.match(html, /type==="limitBuy"\|\|order\.type==="limitSell"/);
