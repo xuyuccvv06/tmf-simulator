@@ -153,6 +153,12 @@ test('existing journals are not cleared and pruning is limited to feature-owned 
   assert.match(html, /tmf\.sim\.account\."\+SIM_MODE/);
 });
 
+
+test('twelve-loss block remains active across a date boundary before the first new candle', () => {
+  assert.match(html, /replayRisk\.lossStreak>=12\|\|replayRisk\.blockedDate===\(bars\[revealed-1\]\?\.d\|\|replayStartDate\)/);
+  assert.match(html, /const entryBlocked=replayRisk\.lossStreak>=12\|\|replayRisk\.blockedDate===\(last\?\.d\|\|replayStartDate\)/);
+  assert.match(html, /replayRisk\.lossStreak>=12\|\|replayRisk\.blockedDate===\(bars\[revealed-1\]\?\.d\|\|replayStartDate\)/);
+});
 test('consecutive-loss streak carries across trading-day boundaries while daily metrics reset', () => {
   assert.match(html, /replayRisk=\{tradingDate:nextDate,dayStartEquity:accountMetrics\(\)\.equity,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:replayRisk\.lossStreak\|\|0,blockedDate:null/);
 });
