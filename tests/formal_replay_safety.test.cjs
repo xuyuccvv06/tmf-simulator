@@ -74,8 +74,13 @@ test('daily profit giveback is tracked for reporting but does not block new trad
 });
 
 test('broker-specific intraday risk liquidation is not guessed without a confirmed broker contract', () => {
-  assert.match(html, /盤中風險指標強制平倉門檻尚未設定期貨商契約/);
-  assert.match(html, /不套用任意 25% 假設/);
+  assert.match(html, /永豐期貨風控模擬：日盤風險指標低於 25% 時觸發代為沖銷/);
+  assert.match(html, /TMF 夜盤屬豁免商品/);
+  assert.match(html, /function brokerRiskIndicatorPercent\(bar\)/);
+  assert.match(html, /return equity\/account\.initial_margin_per_contract\*100/);
+  assert.match(html, /ratio>=25/);
+  assert.match(html, /replayRisk\.brokerRiskTriggered=true/);
+  assert.match(html, /evaluateBrokerIntradayRisk\(current\)/);
 });
 
 test('margin calls persist to the next trading-day noon and are included in snapshots', () => {
