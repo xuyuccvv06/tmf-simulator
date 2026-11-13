@@ -1087,7 +1087,7 @@ finishPosition=function(...args){
  if(!position){marginCall=null;marginLiquidationPending=false;renderMarginCall();}
  if(delta<0)replayRisk.lossStreak=(replayRisk.lossStreak||0)+1;
  else replayRisk.lossStreak=0; // A non-losing trade breaks a consecutive-loss streak.
- const exitDate=String(args[1]||"").slice(0,10);
+ const exitDate=bars[Math.max(0,revealed-1)]?.d||replayStartDate;
  enforceDailyLossLock(exitDate,priorBalance);
  updateTradeUI();
  if(replayRisk.lossStreak>=12){
