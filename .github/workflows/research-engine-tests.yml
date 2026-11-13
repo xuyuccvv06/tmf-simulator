@@ -36,6 +36,8 @@ jobs:
           done
       - name: Test browser simulator cost and margin contracts
         run: node --test tests/tmf_cost_margin_contract.test.cjs
+      - name: Test formal replay safety and risk gates
+        run: node --test tests/formal_replay_safety.test.cjs
 
       - name: Test trade journal statistics and audit behavior
         run: node --test tests/trade_journal_stats.test.cjs

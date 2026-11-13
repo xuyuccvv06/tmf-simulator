@@ -96,17 +96,24 @@ test('TMF official margin history is ordered, bounded and contains all three mar
   assert.equal(new Set(dates).size, dates.length);
 });
 
-test('historical margin apply is explicit and does not overwrite settings on page load', () => {
+test('historical margin is automatically applied by replay trading date and manual lookup remains available', () => {
   assert.match(html, /id="applyHistoricalMargin" disabled/);
   assert.match(html, /function applyHistoricalMargin\(\)/);
-  assert.match(html, /loadHistoricalMarginData\(\)/);
+  assert.match(html, /function applyHistoricalMarginForReplayDate\(date\)/);
+  assert.match(html, /r\.effective_date<date/);
+  assert.match(html, /account\.initial_margin_per_contract=Number\(row\.initial\)/);
+  assert.match(html, /account\.maintenance_margin_per_contract=Number\(row\.maintenance\)/);
   assert.match(html, /function saveMarginSettings\(\)/);
 });
 
-test('historical margin lookup is loaded and both controls are wired', () => {
+test('historical margin data loads before replay initialization and manual controls are wired', () => {
   assert.match(html, /\$\("lookupHistoricalMargin"\)\.onclick=lookupHistoricalMargin/);
   assert.match(html, /\$\("applyHistoricalMargin"\)\.onclick=applyHistoricalMargin/);
-  assert.match(html, /\nloadHistoricalMarginData\(\);\ninit\(\);/);
+  assert.match(html, /async function init\(\)\{\s*try\{\s*await loadHistoricalMarginData\(\)/);
+});
+
+test('new simulation accounts start with the confirmed baseline trading costs', () => {
+  assert.match(html, /commission_per_side:10,base_slippage:1,range_slippage:0,low_volume_penalty:0,dynamic_slippage:false/);
 });
 
 
