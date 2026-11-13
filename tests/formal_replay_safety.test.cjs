@@ -85,6 +85,7 @@ test('broker-specific intraday risk liquidation is not guessed without a confirm
   assert.match(html, /replayRisk\.brokerRiskTriggered=true/);
   assert.match(html, /evaluateBrokerIntradayRisk\(current\)/);
   assert.match(html, /marginLiquidationPending&&position&&isTMFDaySession\(nextBar\)/);
+  assert.match(html, /broker_forced_liquidation/);
 });
 
 test('margin calls persist to the next trading-day noon and are included in snapshots', () => {
