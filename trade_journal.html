@@ -98,6 +98,14 @@ async function readDataset(file){
 function tradeEvents(tid){return db.events.filter(e=>e.trade_id===tid);}
 function tradeDirection(events){const entry=events.find(e=>e.event_type==="entry");const text=String(entry?.narrative||"")+" "+String(entry?.context?.side||entry?.context?.direction||"");if(/空單|\bshort\b/i.test(text))return "空單";if(/多單|\blong\b/i.test(text))return "多單";return "方向未記錄";}
 function permitted(tid,type){const t=tradeEvents(tid).map(e=>e.event_type);if(type==="pre_trade")return !t.includes("entry");if(type==="entry")return !t.includes("entry")&&!t.includes("exit")&&!t.includes("post_trade");if(type==="management")return t.includes("entry")&&!t.includes("exit")&&!t.includes("post_trade");if(type==="exit")return t.includes("entry")&&!t.includes("exit")&&!t.includes("post_trade");if(type==="post_trade")return t.includes("exit")&&!t.includes("post_trade");return false;}
+function formatTaiwanTime(value){
+ if(!value)return "—";
+ const raw=String(value).trim();
+ const normalized=/Z$|[+-]\\d{2}:?\\d{2}$/.test(raw)?raw:(/^\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d/.test(raw)?raw.replace(" ","T")+"+08:00":raw);
+ const date=new Date(normalized);
+ if(Number.isNaN(date.getTime()))return raw;
+ return new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).format(date);
+}
 function eventVoided(eventId,events){
  const voided=new Set();
  for(let i=events.length-1;i>=0;i--){
@@ -165,7 +173,7 @@ function render(){
   const p=document.createElement("p");p.textContent=e.narrative;
   if(e.event_type==="exit"&&typeof e.context?.realized_pnl_twd==="number"){const pnl=document.createElement("small");const effectiveResult=effectiveExitPnl(e,es),effectiveCandidate=effectiveResult?.unit==="twd"?effectiveResult.p:e.context.realized_pnl_twd,effective=Number.isFinite(effectiveCandidate)?effectiveCandidate:e.context.realized_pnl_twd;pnl.textContent="原始淨損益："+(e.context.realized_pnl_twd>0?"+":"")+"$"+Number(e.context.realized_pnl_twd).toLocaleString("zh-TW")+(effective!==e.context.realized_pnl_twd?" · 最新修正："+(effective>0?"+":"")+"$"+Number(effective).toLocaleString("zh-TW"):"");pnl.style.color=effective>0?"#ff8d8d":effective<0?"#71d6a0":"#9aaabd";pnl.style.marginTop="6px";d.append(pnl);}
   if(e.event_type==="amendment"&&e.context?.amendment_kind==="pnl_correction"){const cp=document.createElement("small");cp.textContent="損益修正為："+(e.context.corrected_realized_pnl_twd>0?"+":"")+"$"+e.context.corrected_realized_pnl_twd.toLocaleString("zh-TW");cp.style.color="#79b8ff";d.append(cp);}
-  const time=document.createElement("small");time.textContent=new Date(e.recorded_at).toLocaleString();d.append(strong,time,p);
+  const time=document.createElement("small");time.textContent="操作時間（台灣）："+formatTaiwanTime(e.recorded_at);d.append(strong,time,p);
   if(e.event_type==="exit"&&e.context?.simulation_source==="tmf_simulator"&&e.context?.cost_breakdown){
    const c=e.context.cost_breakdown,money=n=>(Number(n)||0).toLocaleString("zh-TW",{style:"currency",currency:"TWD",maximumFractionDigits:2}),points=n=>(Number(n)||0).toFixed(2)+" 點";
    const card=document.createElement("div");card.style.cssText="margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#101923";
@@ -189,7 +197,7 @@ function render(){
   }
   if(e.target_entry_id){const target=document.createElement("small");target.textContent="對應紀錄："+e.target_entry_id;d.append(target);}
   if(!["amendment","void"].includes(e.event_type)&&eventVoided(e.entry_id,es)){const mark=document.createElement("small");mark.textContent="此紀錄已標記作廢，原始內容仍保留";mark.style.color="#ff8d8d";d.append(mark);}
-  if(e.market_timestamp){const m=document.createElement("small");m.textContent="行情時間："+e.market_timestamp;d.append(m);}
+  if(e.market_timestamp){const m=document.createElement("small");m.textContent="行情時間（台灣）："+formatTaiwanTime(e.market_timestamp);d.append(m);}
   if(e.event_type==="exit"&&(e.context?.stop_history?.length||e.context?.target_history?.length)){
    const audit=document.createElement("div");audit.style.cssText="margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:9px;background:#101923";
    const heading=document.createElement("strong");heading.textContent="停損／停利修改歷程";audit.append(heading);
@@ -197,7 +205,7 @@ function render(){
    rows.forEach(item=>{
     const line=document.createElement("div");line.style.cssText="margin-top:7px;font-size:13px;color:var(--muted)";
     const kind=item.kind==="stop"?"停損":"停利",status=item.status==="accepted"?"已接受":"已拒絕",old=item.old_price==null?"未設定":Number(item.old_price).toLocaleString("en-US"),next=Number(item.new_price).toLocaleString("en-US");
-    line.textContent=kind+"｜"+status+"｜"+old+" → "+next+(item.market_timestamp?"｜行情 "+item.market_timestamp:"")+(item.reason?"｜"+item.reason:"");
+    line.textContent=kind+"｜"+status+"｜"+old+" → "+next+(item.market_timestamp?"｜行情（台灣） "+formatTaiwanTime(item.market_timestamp):"")+(item.reason?"｜"+item.reason:"");
     if(item.status!=="accepted")line.style.color="var(--bad)";else line.style.color="var(--good)";
     audit.append(line);
    });
