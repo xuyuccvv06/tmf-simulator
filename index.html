@@ -1175,7 +1175,7 @@ function restartCurrentReplaySession(){
   return;
  }
  const date=replayStartDate||$("session").value;
- const mode=replayStartMode||$("replayMode").value;
+ const mode="day";
  if(!date||!bars.length)return;
  if((position||pendingOrder)&&!confirm("重新開始會結束目前模擬持倉／取消待成交委託，並將回放進度重設至當日第一根 K 線。帳戶餘額、歷史交易紀錄與原始 K 線資料不會刪除。確定繼續？"))return;
  stop();
