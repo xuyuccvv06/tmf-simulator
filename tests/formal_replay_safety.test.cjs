@@ -152,3 +152,7 @@ test('existing journals are not cleared and pruning is limited to feature-owned 
   assert.match(html, /tmf\.behaviourJournal\."\+SIM_MODE/);
   assert.match(html, /tmf\.sim\.account\."\+SIM_MODE/);
 });
+
+test('consecutive-loss streak carries across trading-day boundaries while daily metrics reset', () => {
+  assert.match(html, /replayRisk=\{tradingDate:nextDate,dayStartEquity:accountMetrics\(\)\.equity,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:replayRisk\.lossStreak\|\|0,blockedDate:null/);
+});
