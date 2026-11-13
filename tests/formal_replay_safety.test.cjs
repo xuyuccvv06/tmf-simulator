@@ -91,7 +91,7 @@ test('margin calls persist to the next trading-day noon and are included in snap
   assert.match(html, /isTMFDaySession\(bar\)&&bar\.t\.slice\(11,16\)==="13:45"/);
   assert.match(html, /isTMFDaySession\(last\)&&last\.t\.slice\(11,16\)==="13:45"/);
   assert.match(html, /dates\.find\(d=>d>bar\.d\)/);
-  assert.match(html, /deadline:next\+" 12:00"/);
+  assert.match(html, /deadline:next\?next\+" 12:00":null/);
   assert.match(html, /保證金追繳期限屆滿強制平倉/);
   assert.match(html, /marginCallStatus/);
   assert.match(html, /account,marginLiquidationPending,marginCall,replayRisk/);
