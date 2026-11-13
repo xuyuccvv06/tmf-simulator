@@ -879,6 +879,14 @@ saveAccount=function(){
 const originalLoadDateForState=loadDate;
 loadDate=function(date){
  const requestedMode=$("replayMode").value,hadPriorReplay=replayStateReady;
+ if(SIM_MODE==="practice"&&localStorage.getItem("tmf.practice.reset-to-50000.v1")!=="done"){
+  // One-time practice reset: clear replay/account snapshots only; keep the append-only trade journal intact.
+  const removePrefixes=["tmf.replay.state.practice.v1.","tmf.sim.account.dataset.practice.v1."];
+  for(let i=localStorage.length-1;i>=0;i--){const key=localStorage.key(i);if(key&&(removePrefixes.some(prefix=>key.startsWith(prefix))||key==="tmf.sim.account.practice.v1"||key==="tmf.sim.account.v1"))localStorage.removeItem(key);}
+  localStorage.removeItem("tmf.replay.backups.practice.v1");
+  account=freshAccount();localStorage.setItem(ACCOUNT_KEY,JSON.stringify(account));
+  localStorage.setItem("tmf.practice.reset-to-50000.v1","done");
+ }
  if(SIM_MODE==="formal"&&formalRunLock&&(date!==formalRunLock.startDate||requestedMode!==formalRunLock.replayMode)){alert("正式盲測已鎖定，不可更改起始日期或交易時段。");$("session").value=formalRunLock.startDate;$("replayMode").value=formalRunLock.replayMode;return;}
  if(replayStateReady){
   saveReplayState(false);
