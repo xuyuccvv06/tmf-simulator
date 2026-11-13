@@ -1049,8 +1049,35 @@ step=function(){
   if(status)status.textContent="交易日 "+current.d+"｜當日損益 "+Math.round(replayRisk.dayNet).toLocaleString("zh-TW")+" 元｜連續虧損 "+replayRisk.lossStreak+" 次｜當日獲利回吐 "+Math.round(replayRisk.profitGiveback||0).toLocaleString("zh-TW")+" 元（僅紀錄）｜"+warning+"｜觸發："+(replayRisk.blockReasons.join("、")||"無");
  }
  if(revealed>=bars.length)sealFormalDecisionLog();
+ updateTradeUI();
  saveReplayState(false);
 };
+function enforceDailyLossLock(currentDate, fallbackStartEquity=null){
+ if(!currentDate)return false;
+ if(replayRisk.tradingDate!==currentDate){
+  replayRisk.tradingDate=currentDate;
+  replayRisk.dayStartEquity=Number.isFinite(fallbackStartEquity)?fallbackStartEquity:accountMetrics().equity;
+  replayRisk.dayNet=0;replayRisk.dayDeposits=0;replayRisk.dayPeakNet=0;replayRisk.profitGiveback=0;
+  replayRisk.blockedDate=null;
+  replayRisk.blockReasons=(replayRisk.blockReasons||[]).filter(x=>x!=="daily_loss_4pct");
+ }
+ const equity=accountMetrics().equity;
+ replayRisk.dayNet=equity-replayRisk.dayStartEquity-(replayRisk.dayDeposits||0);
+ replayRisk.dayPeakNet=Math.max(replayRisk.dayPeakNet||0,replayRisk.dayNet);
+ replayRisk.profitGiveback=Math.max(0,replayRisk.dayPeakNet-replayRisk.dayNet);
+ replayRisk.maxProfitGiveback=Math.max(replayRisk.maxProfitGiveback||0,replayRisk.profitGiveback);
+ const limit=Math.abs(replayRisk.dayStartEquity||0)*0.04;
+ if(limit>0&&replayRisk.dayNet<=-limit){
+  replayRisk.blockedDate=currentDate;
+  if(!replayRisk.blockReasons.includes("daily_loss_4pct"))replayRisk.blockReasons.push("daily_loss_4pct");
+  if(pendingOrder&&["buy","sell","limitBuy","limitSell"].includes(pendingOrder.type)){
+   recordFormalDecision("entry_order_cancelled",{orderType:pendingOrder.type,reason:"當日虧損達 4%"});
+   pendingOrder=null;
+  }
+  return true;
+ }
+ return false;
+}
 const originalFinishForState=finishPosition;
 finishPosition=function(...args){
  const priorBalance=account.balance,closedPosition=position?{side:position.side,entry:position.entry,entryTime:position.entryTime}:null;
@@ -1060,6 +1087,9 @@ finishPosition=function(...args){
  if(!position){marginCall=null;marginLiquidationPending=false;renderMarginCall();}
  if(delta<0)replayRisk.lossStreak=(replayRisk.lossStreak||0)+1;
  else replayRisk.lossStreak=0; // A non-losing trade breaks a consecutive-loss streak.
+ const exitDate=String(args[1]||"").slice(0,10);
+ enforceDailyLossLock(exitDate,priorBalance);
+ updateTradeUI();
  if(replayRisk.lossStreak>=12){
   replayRisk.blockedDate=bars[Math.max(0,revealed-1)]?.d||replayStartDate;
   if(!replayRisk.blockReasons.includes("loss_streak_12"))replayRisk.blockReasons.push("loss_streak_12");
