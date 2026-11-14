@@ -808,12 +808,29 @@ function validateReplayState(s){
  }
  return typeof s.checksum==="string"&&s.checksum===replayChecksum(s);
 }
+function globalRiskStateKey(){return "tmf.replay.risk.global.v1."+SIM_MODE+"."+replayDatasetId;}
+function persistGlobalRiskState(){
+ try{
+  const payload={schema:1,mode:SIM_MODE,datasetId:replayDatasetId,savedAt:new Date().toISOString(),replayRisk:JSON.parse(JSON.stringify(replayRisk))};
+  localStorage.setItem(globalRiskStateKey(),JSON.stringify(payload));
+ }catch(err){const status=$("replaySaveStatus");if(status)status.textContent="風控狀態保存失敗："+err.message;}
+}
+function restoreGlobalRiskState(){
+ try{
+  const raw=localStorage.getItem(globalRiskStateKey());if(!raw)return false;
+  const saved=JSON.parse(raw);
+  if(!saved||saved.schema!==1||saved.mode!==SIM_MODE||saved.datasetId!==replayDatasetId||!saved.replayRisk||!Number.isFinite(Date.parse(saved.savedAt)))return false;
+  replayRisk={...replayRisk,...saved.replayRisk,blockReasons:Array.isArray(saved.replayRisk.blockReasons)?[...saved.replayRisk.blockReasons]:[]};
+  return true;
+ }catch{return false;}
+}
 function saveReplayState(manual=false){
  if(!replayStartDate||!bars.length)return false;
  try{
   const snapshot=replayStatePayload();snapshot.checksum=replayChecksum(snapshot);const key=snapshot.key,raw=JSON.stringify(snapshot);
   if(!validateReplayState(JSON.parse(raw)))throw new Error("保存前完整性驗證未通過");
   localStorage.setItem(key,raw);
+  persistGlobalRiskState();
   const index=JSON.parse(localStorage.getItem(REPLAY_BACKUP_INDEX)||"[]");
   const entry={key,savedAt:snapshot.savedAt,bytes:raw.length,session:snapshot.session,replayMode:snapshot.replayMode};
   index.unshift(entry);
@@ -933,6 +950,8 @@ loadDate=function(date){
   replayRisk={tradingDate:null,dayStartEquity:account.balance,dayNet:0,dayDeposits:0,dayPeakNet:0,profitGiveback:0,maxProfitGiveback:0,lossStreak:0,blockedDate:null,blockReasons:[],brokerRiskTriggered:false,brokerRiskTriggeredAt:null,brokerRiskPercentAtTrigger:null};
   render();updateTradeUI();
  }
+ // The dataset-wide risk state is authoritative; per-session snapshots must not roll back streaks or active locks.
+ restoreGlobalRiskState();
  applyHistoricalMarginForReplayDate(date);
  if(position)checkMargin();
  renderMarginCall();
